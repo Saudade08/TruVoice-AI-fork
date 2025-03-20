@@ -221,7 +221,7 @@ threadpoolctl==3.2.0
 tinycss2==1.4.0
 tokenizers==0.19.1
 tomli==2.1.0
-torch==2.5.1+cu118 -f https://download.pytorch.org/whl/torch_stable.html 
+torch
 torchvision
 torchaudio
 tornado==6.4
