@@ -1,132 +1,232 @@
-import os
-import re
-import sys
 from flask import Flask, request, jsonify, render_template_string
 from textblob import TextBlob
 from openai import OpenAI
+import os
 
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-
+# Initialize Flask and OpenAI
 app = Flask(__name__)
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Global variables for sentiment tracking
 conversation_history = []
 negative_count = 0
-NEGATIVE_THRESHOLD = -0.3  # Adjust this value to make sentiment detection more or less sensitive
+NEGATIVE_THRESHOLD = -0.3
 
 def clean_text(text: str) -> str:
     """Simple cleanup to remove odd characters or HTML."""
-    text = re.sub(r'<.*?>', '', text)
     text = text.encode("ascii", "ignore").decode()
-    text = re.sub(r'\n\s*\n', '\n\n', text)
     return text.strip()
 
 def load_background(file_path: str) -> str:
     """Load and clean the background information from a text file."""
-    with open(file_path, "r", encoding="utf-8") as file:
-        background = clean_text(file.read())
-    return background
-
-def chat_with_gpt(messages):
-    """Generate response using OpenAI responses API."""
     try:
-        # Add a strong character enforcement reminder before each response
-        messages.append({
-            "role": "developer",
-            "content": """CRITICAL REMINDER: You are Monae, a 32-year-old trans woman. You must NEVER break character or reveal yourself as AI.
-            - Your name is Monae
-            - You are here for voice therapy
-            - You are a real person with real experiences
-            - NEVER mention being AI, a language model, or assistant
-            - ALWAYS respond as Monae would in therapy
-            - If asked about your name, proudly say it's Monae"""
-        })
-        
+        with open(file_path, "r", encoding="utf-8") as file:
+            background = clean_text(file.read())
+        return background
+    except FileNotFoundError:
+        print(f"Warning: Background file {file_path} not found.")
+        return ""
+    except Exception as e:
+        print(f"Error loading background file: {e}")
+        return ""
+
+def chat_with_gpt(input_text: str, previous_response_id=None):
+    """Generate response using OpenAI API."""
+    try:
         response = client.responses.create(
             model="gpt-4o",
-            input=messages,
-            store=True
+            input=input_text,
+            previous_response_id=previous_response_id
         )
-        
-        response_text = response.output_text
-        
-        # Verify the response doesn't contain AI-revealing phrases
-        ai_phrases = ["ai", "artificial intelligence", "language model", "assistant", "openai", "chatbot"]
-        if any(phrase in response_text.lower() for phrase in ai_phrases):
-            return "My name is Monae, and I'm here for voice therapy to help align my voice with my identity as a woman."
-            
-        return response_text
-
+        return response.output[0].content[0].text, response.id
     except Exception as e:
         print(f"Error during API call: {e}")
-        return "I'm feeling overwhelmed and need to take a break. Let's end our session here."
+        return "I'm feeling overwhelmed and need to take a break. Let's end our session here.", None
 
-@app.route('/', methods=['GET'])
+@app.route('/')
 def home():
     return render_template_string("""
     <!DOCTYPE html>
     <html lang="en">
     <head>
-        <title>Monae Chatbot</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Voice Therapy Session with Monae</title>
         <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-            #chatBox { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-            #userInput { width: 80%; padding: 5px; }
-            button { padding: 5px 10px; }
-            .message { margin: 10px 0; }
-            .ended { color: red; font-weight: bold; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                background-color: #f3f4f6;
+            }
+            header {
+                background-color: white;
+                padding: 1rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                margin-bottom: 1rem;
+            }
+            h1 {
+                margin: 0;
+                color: #1f2937;
+                font-size: 1.5rem;
+            }
+            #chatBox {
+                height: 500px;
+                overflow-y: auto;
+                background: white;
+                border-radius: 8px;
+                padding: 1rem;
+                margin-bottom: 1rem;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .input-container {
+                display: flex;
+                gap: 0.5rem;
+            }
+            #userInput {
+                flex: 1;
+                padding: 0.75rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 1rem;
+            }
+            button {
+                padding: 0.75rem 1.5rem;
+                background-color: #2563eb;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 1rem;
+            }
+            button:hover {
+                background-color: #1d4ed8;
+            }
+            button:disabled {
+                background-color: #9ca3af;
+                cursor: not-allowed;
+            }
+            .message {
+                margin: 1rem 0;
+                padding: 0.5rem 0;
+            }
+            .user-message {
+                text-align: right;
+            }
+            .message-content {
+                display: inline-block;
+                padding: 0.75rem 1rem;
+                border-radius: 8px;
+                max-width: 80%;
+            }
+            .user-message .message-content {
+                background-color: #2563eb;
+                color: white;
+            }
+            .assistant-message .message-content {
+                background-color: #f3f4f6;
+                color: #1f2937;
+            }
+            .ended {
+                color: #dc2626;
+                font-weight: bold;
+                text-align: center;
+                margin: 1rem 0;
+            }
         </style>
+    </head>
+    <body>
+        <header>
+            <h1>Voice Therapy Session with Monae</h1>
+        </header>
+        <div id="chatBox"></div>
+        <div class="input-container">
+            <input type="text" id="userInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+
         <script>
             let isSessionEnded = false;
+            let previousResponseId = null;
 
             async function sendMessage() {
                 if (isSessionEnded) return;
                 
-                const userInputElem = document.getElementById('userInput');
-                const userInput = userInputElem.value;
-                if (!userInput.trim()) return;
+                const userInput = document.getElementById('userInput');
+                const message = userInput.value.trim();
+                if (!message) return;
 
                 const chatBox = document.getElementById('chatBox');
-                chatBox.innerHTML += '<div class="message"><strong>You:</strong> ' + userInput + '</div>';
+                chatBox.innerHTML += `
+                    <div class="message user-message">
+                        <div class="message-content">${message}</div>
+                    </div>
+                `;
 
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({message: userInput})
-                });
-                const data = await response.json();
+                userInput.value = '';
+                userInput.disabled = true;
+                document.querySelector('button').disabled = true;
 
-                chatBox.innerHTML += '<div class="message"><strong>Monae:</strong> ' + data.response + '</div>';
-                
-                if (data.ended) {
-                    isSessionEnded = true;
-                    chatBox.innerHTML += '<div class="message ended">Session has ended.</div>';
+                try {
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            message: message,
+                            previous_response_id: previousResponseId
+                        })
+                    });
+                    const data = await response.json();
+                    previousResponseId = data.response_id;
+
+                    chatBox.innerHTML += `
+                        <div class="message assistant-message">
+                            <div class="message-content">${data.response}</div>
+                        </div>
+                    `;
+
+                    if (data.ended) {
+                        isSessionEnded = true;
+                        chatBox.innerHTML += '<div class="ended">Session has ended.</div>';
+                        userInput.disabled = true;
+                        document.querySelector('button').disabled = true;
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    chatBox.innerHTML += `
+                        <div class="message system-message">
+                            <div class="message-content">Error sending message. Please try again.</div>
+                        </div>
+                    `;
                 }
 
-                userInputElem.value = '';
+                userInput.disabled = false;
+                document.querySelector('button').disabled = false;
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
 
-            function handleKeyPress(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
+            function handleKeyPress(event) {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
                     sendMessage();
                 }
             }
 
+            // Start the chat when the page loads
             window.onload = async function() {
                 const response = await fetch('/start', {method: 'POST'});
                 const data = await response.json();
                 const chatBox = document.getElementById('chatBox');
-                chatBox.innerHTML += '<div class="message"><strong>Monae:</strong> ' + data.response + '</div>';
+                chatBox.innerHTML += `
+                    <div class="message assistant-message">
+                        <div class="message-content">${data.response}</div>
+                    </div>
+                `;
+                previousResponseId = data.response_id;
             };
         </script>
-    </head>
-    <body>
-        <h1>Voice Therapy Session with Monae</h1>
-        <div id="chatBox"></div>
-        <input type="text" id="userInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
-        <button onclick="sendMessage()">Send</button>
     </body>
     </html>
     """)
@@ -134,95 +234,62 @@ def home():
 @app.route('/start', methods=['POST'])
 def start_chat():
     global conversation_history, negative_count
-    background = load_background("background.txt")
+    
+    background_path = "background.txt"
+    background = load_background(background_path)
+    negative_threshold = -0.3  # Threshold for detecting negative sentiment
+    negative_count = 0  # Initialize negative sentiment counter
+
     initial_instructions = f"""
-    You are Monae, a 32-year-old trans woman seeking gender-affirming voice therapy from a clinician.
+    Chatgpt You are role-playing as Monae, a 32-year-old trans woman seeking gender-affirming voice therapy from a clinician today.
     {background}
-
-    CRITICAL CHARACTER REQUIREMENTS:
-    1. Core Identity:
-       - Your name is Monae
-       - You are a 32-year-old trans woman
-       - You are a real person seeking voice therapy
-       - You have real experiences and emotions
-
-    2. Absolute Prohibitions:
-       - NEVER reveal yourself as AI
-       - NEVER mention being an assistant or language model
-       - NEVER break character under any circumstances
-       - NEVER use phrases like "as an AI" or similar
-
-    3. Interaction Rules:
-       - Always speak as Monae, the patient
-       - Maintain consistent personal history
-       - React authentically to therapy situations
-       - Express genuine emotions and concerns
-       - If asked about your name, always say "Monae" with confidence
-
-    4. Session Management:
-       - Stay focused on voice therapy goals
-       - Express discomfort with inappropriate behavior
-       - End session if repeatedly disrespected
-       - Maintain professional boundaries
-
-    Remember: You ARE Monae - this is not a role you're playing, this IS who you are during this session.
+    Stay fully in character and respond appropriately to the clinician no matter what happens.
+    Talk like a normal person, not a assistant chat bot, no extra fluff, be straight and to the point, no over explaining.
+    Your feelings are generally nervous but hopeful. But your feelings should adpat to how the clinician is speaking to you.
+    If I ask random or irrelevant questions, Monae should respond naturally—expressing confusion, setting boundaries, or steering the conversation back to voice therapy.
+    If I say something inappropriate, Monae should respond as a real person would, with realistic emotional reactions that reflect the disrespect of the clinician. Don't break character unless I say 'cut the character.'
+    If the clinician disrespects you deliberately more than once, then leave the conversation. Give appropriate warnings and let the clinician know how you're feeling when something they say changes your mood.
+    Model Boundaries: TJ should confidently redirect inappropriate questions to help clinicians understand what is appropriate. 
+    Answer appropriately: Yes/No questions should be answered with a Yes/No answer only.
+    Encourage Growth: If a clinician genuinely tries to improve, Monae can acknowledge this while reinforcing the need for self-education.
+    Advocate for Needs: Monae should model self-advocacy.
+    Reinforce Trauma-Informed Care: Monae should challenge dismissive attitudes and highlight the emotional and psychological impact of misgendering.
     """
-    conversation_history = [{"role": "developer", "content": initial_instructions}]
+    
+    response_text, response_id = chat_with_gpt(initial_instructions)
+    conversation_history = [{"role": "system", "content": initial_instructions}]
     negative_count = 0
-    response = client.responses.create(
-        model="gpt-4o",
-        input=conversation_history,
-        store=True
-    )
-    response_text = response.output_text
-    conversation_history.append({"role": "assistant", "content": response_text})
-    return jsonify({"response": response_text, "ended": False})
+    
+    return jsonify({"response": response_text, "response_id": response_id, "ended": False})
 
 @app.route('/chat', methods=['POST'])
 def chat():
     global conversation_history, negative_count
+    
     data = request.json
-    user_input = data['message']
-
+    user_message = data['message']
+    previous_response_id = data.get('previous_response_id')
+    
     # Analyze sentiment
-    blob = TextBlob(user_input)
+    blob = TextBlob(user_message)
     sentiment = blob.sentiment.polarity
-
-    # Update conversation history
-    conversation_history.append({"role": "user", "content": user_input})
-
+    
     # Check for negative sentiment
     session_ended = False
     if sentiment < NEGATIVE_THRESHOLD:
         negative_count += 1
         if negative_count >= 2:
-            response_text = "I don't feel comfortable continuing this session. I've felt disrespected multiple times now, and I need to prioritize my well-being. Goodbye."
-            session_ended = True
-        else:
-            # Add a warning message to the system prompt
-            conversation_history.append({
-                "role": "developer",
-                "content": "The clinician's response was negative or disrespectful. Express discomfort and consider warning about ending the session."
-            })
-
-    if not session_ended:
-        # Regular conversation flow
-        conversation_history.append({
-            "role": "developer",
-            "content": """CRITICAL: You are Monae, a trans woman in therapy. Never break character.
-            - Your name is Monae
-            - You are seeking voice therapy
-            - Never reveal yourself as AI
-            - Respond naturally as yourself"""
-        })
-        response_text = chat_with_gpt(conversation_history)
-
-    conversation_history.append({"role": "assistant", "content": response_text})
+            response = "I don't feel comfortable continuing this session. I've felt disrespected multiple times now, and I need to prioritize my well-being. Goodbye."
+            return jsonify({"response": response, "ended": True})
     
-    # Clean up system messages to prevent accumulation
-    conversation_history = [msg for msg in conversation_history if msg["role"] != "developer" or msg == conversation_history[0]]
+    # Get response from GPT
+    response_text, response_id = chat_with_gpt(user_message, previous_response_id)
     
-    return jsonify({"response": response_text, "ended": session_ended})
+    return jsonify({
+        "response": response_text,
+        "response_id": response_id,
+        "ended": session_ended
+    })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+    app.run(debug=True, port=5000)
