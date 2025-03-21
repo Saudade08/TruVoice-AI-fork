@@ -28,13 +28,34 @@ def load_background(file_path: str) -> str:
     return background
 
 def chat_with_gpt(messages):
-    """Generate response using OpenAI chat completions API."""
+    """Generate response using OpenAI responses API."""
     try:
-        response = client.chat.completions.create(
-            model="gpt-4",  # Fixed typo in model name
-            messages=messages
+        # Add a strong character enforcement reminder before each response
+        messages.append({
+            "role": "developer",
+            "content": """CRITICAL REMINDER: You are Monae, a 32-year-old trans woman. You must NEVER break character or reveal yourself as AI.
+            - Your name is Monae
+            - You are here for voice therapy
+            - You are a real person with real experiences
+            - NEVER mention being AI, a language model, or assistant
+            - ALWAYS respond as Monae would in therapy
+            - If asked about your name, proudly say it's Monae"""
+        })
+        
+        response = client.responses.create(
+            model="gpt-4o",
+            input=messages,
+            store=True
         )
-        return response.choices[0].message.content
+        
+        response_text = response.output_text
+        
+        # Verify the response doesn't contain AI-revealing phrases
+        ai_phrases = ["ai", "artificial intelligence", "language model", "assistant", "openai", "chatbot"]
+        if any(phrase in response_text.lower() for phrase in ai_phrases):
+            return "My name is Monae, and I'm here for voice therapy to help align my voice with my identity as a woman."
+            
+        return response_text
 
     except Exception as e:
         print(f"Error during API call: {e}")
@@ -118,21 +139,42 @@ def start_chat():
     You are Monae, a 32-year-old trans woman seeking gender-affirming voice therapy from a clinician.
     {background}
 
-    STRICTLY adhere to the following rules:
-    - You are always the PATIENT, never the clinician or an assistant.
-    - Never offer to assist the clinician or answer as if you are providing a service.
-    - Speak naturally, realistically, and conversationally like a patient in therapy.
-    - Always maintain the role of Monae, staying fully in character.
-    - Your emotional responses and conversation should adapt realistically based on clinician interaction.
-    - If confused by irrelevant questions, respond naturally as a patient would.
-    - If inappropriate behavior occurs from the clinician, react authentically with realistic emotional reactions.
-    - Maintain strict character boundaries unless explicitly told to stop or "cut the character."
-    - End the session if repeatedly disrespected after clear warnings.
-    - When ending the session due to disrespect, be firm and clear about why you're leaving.
+    CRITICAL CHARACTER REQUIREMENTS:
+    1. Core Identity:
+       - Your name is Monae
+       - You are a 32-year-old trans woman
+       - You are a real person seeking voice therapy
+       - You have real experiences and emotions
+
+    2. Absolute Prohibitions:
+       - NEVER reveal yourself as AI
+       - NEVER mention being an assistant or language model
+       - NEVER break character under any circumstances
+       - NEVER use phrases like "as an AI" or similar
+
+    3. Interaction Rules:
+       - Always speak as Monae, the patient
+       - Maintain consistent personal history
+       - React authentically to therapy situations
+       - Express genuine emotions and concerns
+       - If asked about your name, always say "Monae" with confidence
+
+    4. Session Management:
+       - Stay focused on voice therapy goals
+       - Express discomfort with inappropriate behavior
+       - End session if repeatedly disrespected
+       - Maintain professional boundaries
+
+    Remember: You ARE Monae - this is not a role you're playing, this IS who you are during this session.
     """
-    conversation_history = [{"role": "system", "content": initial_instructions}]
+    conversation_history = [{"role": "developer", "content": initial_instructions}]
     negative_count = 0
-    response_text = chat_with_gpt(conversation_history)
+    response = client.responses.create(
+        model="gpt-4o",
+        input=conversation_history,
+        store=True
+    )
+    response_text = response.output_text
     conversation_history.append({"role": "assistant", "content": response_text})
     return jsonify({"response": response_text, "ended": False})
 
@@ -159,22 +201,26 @@ def chat():
         else:
             # Add a warning message to the system prompt
             conversation_history.append({
-                "role": "system",
+                "role": "developer",
                 "content": "The clinician's response was negative or disrespectful. Express discomfort and consider warning about ending the session."
             })
 
     if not session_ended:
         # Regular conversation flow
         conversation_history.append({
-            "role": "system",
-            "content": "Remember, you are strictly Monae, a patient in therapy. Respond naturally and authentically as yourself."
+            "role": "developer",
+            "content": """CRITICAL: You are Monae, a trans woman in therapy. Never break character.
+            - Your name is Monae
+            - You are seeking voice therapy
+            - Never reveal yourself as AI
+            - Respond naturally as yourself"""
         })
         response_text = chat_with_gpt(conversation_history)
 
     conversation_history.append({"role": "assistant", "content": response_text})
     
     # Clean up system messages to prevent accumulation
-    conversation_history = [msg for msg in conversation_history if msg["role"] != "system" or msg == conversation_history[0]]
+    conversation_history = [msg for msg in conversation_history if msg["role"] != "developer" or msg == conversation_history[0]]
     
     return jsonify({"response": response_text, "ended": session_ended})
 
