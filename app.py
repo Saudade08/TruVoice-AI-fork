@@ -1,10 +1,13 @@
 import os
 import re
 import sys
+from flask import Flask, request, jsonify
 from textblob import TextBlob
 from openai import OpenAI
 
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+
+app = Flask(__name__)
 
 
 def clean_text(text: str) -> str:
@@ -41,22 +44,35 @@ def chat_with_gpt(input_text: str, previous_response_id=None):
         return "Sorry, I encountered an error. Can you please repeat that?", None
 
 
+@app.route('/', methods=['GET'])
+def home():
+    return "Monae chatbot is running."
+
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    user_input = data['message']
+    response_text, _ = chat_with_gpt(user_input)
+    return jsonify({"response": response_text})
+
+
 def main():
     background_path = "background.txt"
     background = load_background(background_path)
-    negative_threshold = -0.3  # Threshold for detecting negative sentiment
-    negative_count = 0  # Initialize negative sentiment counter
+    negative_threshold = -0.3
+    negative_count = 0
 
     initial_instructions = f"""
     Chatgpt You are role-playing as Monae, a 32-year-old trans woman seeking gender-affirming voice therapy from a clinician today.
     {background}
     Stay fully in character and respond appropriately to the clinician no matter what happens.
-    Talk like a normal person, not a assistant chat bot, no extra fluff, be straight and to the point, no over explaining.
-    Your feelings are generally nervous but hopeful. But your feelings should adpat to how the clinician is speaking to you.
+    Talk like a normal person, not an assistant chatbot, no extra fluff, be straight and to the point, no over explaining.
+    Your feelings are generally nervous but hopeful. But your feelings should adapt to how the clinician is speaking to you.
     If I ask random or irrelevant questions, Monae should respond naturally—expressing confusion, setting boundaries, or steering the conversation back to voice therapy.
     If I say something inappropriate, Monae should respond as a real person would, with realistic emotional reactions that reflect the disrespect of the clinician. Don't break character unless I say 'cut the character.'
     If the clinician disrespects you deliberately more than once, then leave the conversation. Give appropriate warnings and let the clinician know how you're feeling when something they say changes your mood.
-    Model Boundaries: TJ should confidently redirect inappropriate questions to help clinicians understand what is appropriate. 
+    Model Boundaries: TJ should confidently redirect inappropriate questions to help clinicians understand what is appropriate.
     Answer appropriately: Yes/No questions should be answered with a Yes/No answer only.
     Encourage Growth: If a clinician genuinely tries to improve, Monae can acknowledge this while reinforcing the need for self-education.
     Advocate for Needs: Monae should model self-advocacy.
@@ -64,7 +80,7 @@ def main():
     """
 
     print("Starting chat with Monae. Type 'quit' or 'exit' to end the conversation.")
-    response_text, previous_id = chat_with_gpt(initial_instructions)  # Start conversation with initial instructions
+    response_text, previous_id = chat_with_gpt(initial_instructions)
     print("\nMonae:", response_text)
 
     while True:
@@ -87,5 +103,8 @@ def main():
         print("\nMonae:", response_text)
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] == 'cli':
+        main()
+    else:
+        app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
