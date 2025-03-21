@@ -18,8 +18,8 @@ backoff==2.2.1
 beautifulsoup4==4.12.3
 bleach==6.2.0
 blinker==1.9.0
-boto3
-botocore
+boto3==1.35.63
+botocore==1.35.63
 CacheControl==0.14.0
 cachetools==5.3.3
 cassandra-driver==3.29.1
@@ -116,7 +116,6 @@ jupyterlab_server==2.27.3
 kiwisolver==1.4.5
 lazy_loader==0.3
 librosa==0.10.1
-llvmlite==0.41.1
 lz4==4.3.3
 MarkupSafe==2.1.5
 marshmallow==3.23.1
@@ -127,7 +126,7 @@ more-itertools==10.1.0
 mpmath==1.3.0
 msgpack==1.0.7
 multidict==6.1.0
-multimethod==1.11.1
+multimethod==1.11
 multiprocess==0.70.17
 music21==9.1.0
 mypy-extensions==1.0.0
@@ -139,8 +138,7 @@ nest-asyncio==1.6.0
 networkx==3.2.1
 notebook==7.3.2
 notebook_shim==0.2.4
-numba==0.58.1
-numpy==1.25.2
+numpy==1.26.4
 openai==1.66.3
 opencv-python==4.10.0.84
 opencv-python-headless==4.10.0.84
@@ -164,7 +162,7 @@ propcache==0.2.0
 proto-plus==1.23.0
 protobuf==4.25.3
 psutil==5.9.8
-psycopg2==2.9.10
+psycopg2-binary==2.9.10
 pure-eval==0.2.2
 py-cpuinfo==9.0.0
 pyasn1==0.6.0
@@ -177,13 +175,12 @@ PyJWT==2.8.0
 pymongo==4.6.2
 PyMySQL==1.1.0
 pyparsing==3.1.1
-pysnmp==7.1.13
+pysnmp==7.2.0
 python-dateutil==2.8.2
 python-dotenv==1.0.1
 python-json-logger==3.2.1
 pytz==2024.1
 PyWavelets==1.5.0
-pywin32==306; sys_platform == 'win32'
 PyYAML==6.0.1
 pyzmq==25.1.2
 redis==5.0.1
@@ -196,11 +193,11 @@ rfc3986-validator==0.1.1
 roboflow==1.1.49
 rpds-py==0.22.3
 rsa==4.9
-s3transfer
+s3transfer==0.10.3
 safetensors==0.4.4
 scikit-learn==1.3.2
-scipy==1.11.4
-seaborn==0.12.2
+scipy==1.12.0
+seaborn==0.13.1
 Send2Trash==1.8.3
 six==1.16.0
 smmap==5.0.1
@@ -216,14 +213,13 @@ sympy==1.13.1
 tangled-up-in-unicode==0.2.0
 tensor==0.3.6
 terminado==0.18.1
-thop==0.1.1.post2209072238
 threadpoolctl==3.2.0
 tinycss2==1.4.0
 tokenizers==0.19.1
-tomli==2.1.0
-torch
-torchvision
-torchaudio
+tomli==2.0.1
+torch==2.5.1
+torchaudio==2.5.1
+torchvision==0.20.1
 tornado==6.4
 tqdm==4.66.2
 traitlets==5.14.1
@@ -250,3 +246,4 @@ yarl==1.17.2
 ydata-profiling==4.6.4
 zipp==3.20.1
 zope.interface==7.1.1
+gunicorn==21.2.0
