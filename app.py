@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string
 from textblob import TextBlob
 from openai import OpenAI
 
@@ -46,7 +46,33 @@ def chat_with_gpt(input_text: str, previous_response_id=None):
 
 @app.route('/', methods=['GET'])
 def home():
-    return "Monae chatbot is running."
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang=\"en\">
+    <head>
+        <title>Monae Chatbot</title>
+        <script>
+            async function sendMessage() {
+                const userInput = document.getElementById('userInput').value;
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: userInput})
+                });
+                const data = await response.json();
+                document.getElementById('chatResponse').textContent = data.response;
+            }
+        </script>
+    </head>
+    <body>
+        <h1>Monae Chatbot</h1>
+        <input type=\"text\" id=\"userInput\" placeholder=\"Type your message...\" style=\"width: 300px;\">
+        <button onclick=\"sendMessage()\">Send</button>
+        <p><strong>Response:</strong></p>
+        <div id=\"chatResponse\" style=\"white-space: pre-wrap; margin-top: 10px;\"></div>
+    </body>
+    </html>
+    """)
 
 
 @app.route('/chat', methods=['POST'])
