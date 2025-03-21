@@ -3,7 +3,8 @@ import re
 import sys
 from textblob import TextBlob
 from openai import OpenAI
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))  # Simplified initialization
+
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 
 def clean_text(text: str) -> str:
@@ -30,7 +31,6 @@ def chat_with_gpt(input_text: str, previous_response_id=None):
             previous_response_id=previous_response_id
         )
 
-        # Assuming the response format provides the output text and the new response ID
         response_text = response.output_text
         new_response_id = response.id
 
@@ -46,7 +46,6 @@ def main():
     background = load_background(background_path)
     negative_threshold = -0.3  # Threshold for detecting negative sentiment
     negative_count = 0  # Initialize negative sentiment counter
-
 
     initial_instructions = f"""
     Chatgpt You are role-playing as Monae, a 32-year-old trans woman seeking gender-affirming voice therapy from a clinician today.
@@ -73,17 +72,16 @@ def main():
         if user_input.lower() in ["quit", "exit"]:
             print("Ending chat. Goodbye.")
             break
-        # Analyze sentiment of the input
+
         blob = TextBlob(user_input)
         sentiment = blob.sentiment.polarity
 
-        # Check for negative sentiment
         if sentiment < negative_threshold:
             negative_count += 1
 
         if negative_count >= 2:
             print("\nMonae: This conversation has become too negative too often. I'm ending this session now. Goodbye.")
-            sys.exit(0)  # Terminate the application
+            sys.exit(0)
 
         response_text, previous_id = chat_with_gpt(user_input, previous_id)
         print("\nMonae:", response_text)
