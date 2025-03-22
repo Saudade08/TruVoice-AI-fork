@@ -1,13 +1,39 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Therapy Session with Monae</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <header>
+        <h1>Voice Therapy Session with Monae</h1>
+    </header>
+
+    <main>
+        <div id="chatBox" class="chat-container"></div>
+        
+        <div id="typingIndicator" class="typing-indicator hidden">
+            Monae is typing...
+        </div>
+
+        <div class="input-container">
+            <textarea
+                id="userInput"
+                class="chat-input"
+                placeholder="Type your message..."
+                rows="1"
+                maxlength="500"
+            ></textarea>
+            <button id="sendButton" class="btn btn-primary">Send</button>
+        </div>
+
+        <button id="restartButton" class="btn btn-success hidden">
+            Start New Session
+        </button>
+    </main>
+
+    <script src="/js/chat.js"></script>
+</body>
 </html>
