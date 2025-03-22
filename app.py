@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template
 from textblob import TextBlob
 from openai import OpenAI
 import os
@@ -91,7 +91,7 @@ def log_conversation(user_message: str, assistant_response: str, sentiment: floa
 @app.route('/')
 def home():
     """Render the main chat interface."""
-    return render_template_string('index.html')
+    return render_template('index.html')
 
 @app.route('/status')
 def check_status():
