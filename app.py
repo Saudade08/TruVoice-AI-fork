@@ -91,7 +91,7 @@ def log_conversation(user_message: str, assistant_response: str, sentiment: floa
 @app.route('/')
 def home():
     """Render the main chat interface."""
-    return render_template('index.html')
+    return render_template_string('index.html')
 
 @app.route('/status')
 def check_status():
