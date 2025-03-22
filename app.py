@@ -11,6 +11,7 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 conversation_history = []
 negative_count = 0
 NEGATIVE_THRESHOLD = -0.3
+session_ended = False  # New global variable to track session status
 
 def clean_text(text: str) -> str:
     """Simple cleanup to remove odd characters or HTML."""
@@ -135,6 +136,20 @@ def home():
                 text-align: center;
                 margin: 1rem 0;
             }
+            #restartButton {
+                display: none;
+                margin: 1rem auto;
+                padding: 0.75rem 1.5rem;
+                background-color: #10b981;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 1rem;
+            }
+            #restartButton:hover {
+                background-color: #059669;
+            }
         </style>
     </head>
     <body>
@@ -144,8 +159,9 @@ def home():
         <div id="chatBox"></div>
         <div class="input-container">
             <input type="text" id="userInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
-            <button onclick="sendMessage()">Send</button>
+            <button id="sendButton" onclick="sendMessage()">Send</button>
         </div>
+        <button id="restartButton" onclick="restartSession()">Start New Session</button>
 
         <script>
             let isSessionEnded = false;
@@ -167,7 +183,7 @@ def home():
 
                 userInput.value = '';
                 userInput.disabled = true;
-                document.querySelector('button').disabled = true;
+                document.querySelector('#sendButton').disabled = true;
 
                 try {
                     const response = await fetch('/chat', {
@@ -188,10 +204,7 @@ def home():
                     `;
 
                     if (data.ended) {
-                        isSessionEnded = true;
-                        chatBox.innerHTML += '<div class="ended">Session has ended.</div>';
-                        userInput.disabled = true;
-                        document.querySelector('button').disabled = true;
+                        endSession();
                     }
                 } catch (error) {
                     console.error('Error:', error);
@@ -202,40 +215,111 @@ def home():
                     `;
                 }
 
-                userInput.disabled = false;
-                if (!isSessionEnded) {
-                    document.querySelector('button').disabled = false;
-                }
+                userInput.disabled = !isSessionEnded;
+                document.querySelector('#sendButton').disabled = isSessionEnded;
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
 
+            function endSession() {
+                isSessionEnded = true;
+                document.getElementById('chatBox').innerHTML += '<div class="ended">Session has ended.</div>';
+                document.getElementById('userInput').disabled = true;
+                document.querySelector('#sendButton').disabled = true;
+                document.getElementById('restartButton').style.display = 'block';
+            }
+
             function handleKeyPress(event) {
-                if (event.key === 'Enter' && !event.shiftKey) {
+                if (event.key === 'Enter' && !event.shiftKey && !isSessionEnded) {
                     event.preventDefault();
                     sendMessage();
                 }
             }
 
+            async function restartSession() {
+                try {
+                    const response = await fetch('/restart', {method: 'POST'});
+                    const data = await response.json();
+                    if (data.success) {
+                        isSessionEnded = false;
+                        previousResponseId = null;
+                        document.getElementById('chatBox').innerHTML = '';
+                        document.getElementById('userInput').disabled = false;
+                        document.querySelector('#sendButton').disabled = false;
+                        document.getElementById('restartButton').style.display = 'none';
+                        
+                        // Start a new session
+                        const startResponse = await fetch('/start', {method: 'POST'});
+                        const startData = await startResponse.json();
+                        document.getElementById('chatBox').innerHTML += `
+                            <div class="message assistant-message">
+                                <div class="message-content">${startData.response}</div>
+                            </div>
+                        `;
+                        previousResponseId = startData.response_id;
+                    }
+                } catch (error) {
+                    console.error('Error restarting session:', error);
+                }
+            }
+
+            // Check session status when page loads
+            async function checkSessionStatus() {
+                try {
+                    const response = await fetch('/status');
+                    const data = await response.json();
+                    
+                    if (data.ended) {
+                        isSessionEnded = true;
+                        document.getElementById('userInput').disabled = true;
+                        document.querySelector('#sendButton').disabled = true;
+                        document.getElementById('restartButton').style.display = 'block';
+                    } else {
+                        // Start the chat if not ended
+                        const startResponse = await fetch('/start', {method: 'POST'});
+                        const startData = await startResponse.json();
+                        document.getElementById('chatBox').innerHTML += `
+                            <div class="message assistant-message">
+                                <div class="message-content">${startData.response}</div>
+                            </div>
+                        `;
+                        previousResponseId = startData.response_id;
+                    }
+                } catch (error) {
+                    console.error('Error checking session status:', error);
+                }
+            }
+
             // Start the chat when the page loads
-            window.onload = async function() {
-                const response = await fetch('/start', {method: 'POST'});
-                const data = await response.json();
-                const chatBox = document.getElementById('chatBox');
-                chatBox.innerHTML += `
-                    <div class="message assistant-message">
-                        <div class="message-content">${data.response}</div>
-                    </div>
-                `;
-                previousResponseId = data.response_id;
-            };
+            window.onload = checkSessionStatus;
         </script>
     </body>
     </html>
     """)
 
+@app.route('/status')
+def check_status():
+    global session_ended
+    return jsonify({"ended": session_ended})
+
+@app.route('/restart', methods=['POST'])
+def restart_session():
+    global negative_count, session_ended, conversation_history
+    negative_count = 0
+    session_ended = False
+    conversation_history = []
+    return jsonify({"success": True})
+
 @app.route('/start', methods=['POST'])
 def start_chat():
-    global conversation_history, negative_count
+    global conversation_history, negative_count, session_ended
+    
+    # If session is already ended, don't proceed
+    if session_ended:
+        return jsonify({
+            "response": "Session has ended. Please restart to begin a new session.",
+            "response_id": None,
+            "ended": True
+        })
     
     background_path = "background.txt"
     background = load_background(background_path)
@@ -264,7 +348,15 @@ def start_chat():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    global conversation_history, negative_count
+    global conversation_history, negative_count, session_ended
+    
+    # If session is already ended, don't process new messages
+    if session_ended:
+        return jsonify({
+            "response": "Session has ended. Please restart to begin a new session.",
+            "response_id": None,
+            "ended": True
+        })
     
     data = request.json
     user_message = data['message']
@@ -278,6 +370,7 @@ def chat():
     if sentiment < NEGATIVE_THRESHOLD:
         negative_count += 1
         if negative_count >= 2:
+            session_ended = True  # Mark the session as ended globally
             response = "I don't feel comfortable continuing this session. I've felt disrespected multiple times now, and I need to prioritize my well-being. Goodbye."
             return jsonify({
                 "response": response,
@@ -295,7 +388,7 @@ def chat():
     return jsonify({
         "response": response_text,
         "response_id": response_id,
-        "ended": False
+        "ended": session_ended
     })
 
 if __name__ == '__main__':
