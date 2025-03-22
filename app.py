@@ -203,7 +203,9 @@ def home():
                 }
 
                 userInput.disabled = false;
-                document.querySelector('button').disabled = false;
+                if (!isSessionEnded) {
+                    document.querySelector('button').disabled = false;
+                }
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
 
@@ -237,7 +239,6 @@ def start_chat():
     
     background_path = "background.txt"
     background = load_background(background_path)
-    negative_threshold = -0.3  # Threshold for detecting negative sentiment
     negative_count = 0  # Initialize negative sentiment counter
 
     initial_instructions = f"""
@@ -258,7 +259,6 @@ def start_chat():
     
     response_text, response_id = chat_with_gpt(initial_instructions)
     conversation_history = [{"role": "system", "content": initial_instructions}]
-    negative_count = 0
     
     return jsonify({"response": response_text, "response_id": response_id, "ended": False})
 
@@ -275,20 +275,27 @@ def chat():
     sentiment = blob.sentiment.polarity
     
     # Check for negative sentiment
-    session_ended = False
     if sentiment < NEGATIVE_THRESHOLD:
         negative_count += 1
         if negative_count >= 2:
             response = "I don't feel comfortable continuing this session. I've felt disrespected multiple times now, and I need to prioritize my well-being. Goodbye."
-            return jsonify({"response": response, "ended": True})
+            return jsonify({
+                "response": response,
+                "response_id": None,
+                "ended": True
+            })
     
     # Get response from GPT
     response_text, response_id = chat_with_gpt(user_message, previous_response_id)
     
+    # Check if this was a negative interaction but not enough to end the session
+    if sentiment < NEGATIVE_THRESHOLD and negative_count == 1:
+        response_text = "I feel disrespected by that comment. I want to continue our session, but please be more mindful of your words. " + response_text
+    
     return jsonify({
         "response": response_text,
         "response_id": response_id,
-        "ended": session_ended
+        "ended": False
     })
 
 if __name__ == '__main__':
