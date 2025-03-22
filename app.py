@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template_string
 from textblob import TextBlob
 from openai import OpenAI
 import os
