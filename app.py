@@ -59,19 +59,27 @@ def load_background(file_path: str) -> str:
         logger.error(f"Error loading background file: {e}")
         return ""
 
-def chat_with_gpt(input_text: str, previous_response_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
-    """Generate response using OpenAI API with error handling and logging."""
+def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
+    """Generate response using OpenAI's Responses API with structured messages."""
     try:
         response = client.responses.create(
             model="gpt-4o",
-            input=input_text,
+            input=messages,
             previous_response_id=previous_response_id,
             timeout=REQUEST_TIMEOUT
         )
-        return response.output[0].content[0].text, response.id
+        
+        # Safely extract and concatenate text outputs
+        response_text = ''.join(
+            content.text for item in response.output if item.type == 'message'
+            for content in item.content if content.type == 'output_text'
+        )
+        return response_text, response.id
+    
     except Exception as e:
         logger.error(f"Error during API call: {e}")
         return "I need to take a break from this session. Thank you for understanding.", None
+
 
 def log_conversation(user_message: str, assistant_response: str, sentiment: float) -> None:
     """Log conversation details for analysis."""
@@ -111,9 +119,9 @@ def restart_session():
         logger.error(f"Error restarting session: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+
 @app.route('/start', methods=['POST'])
 def start_chat():
-    """Initialize a new chat session."""
     if state.is_ended:
         return jsonify({
             "response": "Session has ended. Please restart to begin a new session.",
@@ -123,7 +131,9 @@ def start_chat():
 
     try:
         background = load_background("background.txt")
-        initial_instructions = f"""
+        initial_instructions = {
+            "role": "developer",
+            "content": f"""
 You are now Monae, a 32-year-old trans woman at your voice therapy appointment today. This is not a roleplay - you ARE Monae for this entire conversation.
 {background}
 Never break character or respond as ChatGPT. You're a real person seeking gender-affirming voice therapy, not an AI assistant.
@@ -139,23 +149,34 @@ Consistently advocate for your needs as a patient seeking voice therapy.
 Respond authentically to any dismissive attitudes, especially regarding gender identity, showing how such comments impact you emotionally.
 Remember: You are Monae having a voice therapy session - not an AI helping someone understand a character.
 """
-        
-        response_text, response_id = chat_with_gpt(initial_instructions)
-        state.conversation_history = [{"role": "system", "content": initial_instructions}]
+        }
+
+        initial_prompt = {
+            "role": "user",
+            "content": "Who are you and what brings you in?"
+        }
+
+        messages = [initial_instructions, initial_prompt]
+
+        response_text, response_id = chat_with_gpt(messages)
+
+        # Set initial conversation history clearly
+        state.conversation_history = messages + [{"role": "assistant", "content": response_text}]
         state.last_message_time = datetime.now()
-        
+
         return jsonify({
             "response": response_text,
             "response_id": response_id,
             "ended": False
         })
+
     except Exception as e:
         logger.error(f"Error starting chat: {e}")
         return jsonify({"error": "Failed to start chat session"}), 500
 
+
 @app.route('/chat', methods=['POST'])
 def chat():
-    """Handle chat messages and maintain conversation state."""
     if state.is_ended:
         return jsonify({
             "response": "Session has ended. Please restart to begin a new session.",
@@ -168,11 +189,11 @@ def chat():
         user_message = data['message'][:MAX_MESSAGE_LENGTH]
         previous_response_id = data.get('previous_response_id')
 
-        # Analyze sentiment
+        # Sentiment analysis
         blob = TextBlob(user_message)
         sentiment = blob.sentiment.polarity
 
-        # Check for negative sentiment
+        # Negative sentiment handling
         if sentiment < NEGATIVE_THRESHOLD:
             state.negative_count += 1
             if state.negative_count >= 2:
@@ -185,14 +206,26 @@ def chat():
                     "ended": True
                 })
 
-        # Get response from GPT
-        response_text, response_id = chat_with_gpt(user_message, previous_response_id)
+        state.conversation_history.append({"role": "user", "content": user_message})
 
-        # Add warning for first negative interaction
+        # Explicit reminder to stay in character
+        explicit_reminder = {
+            "role": "developer",
+            "content": "You are strictly Monae, never break character, respond naturally as a patient, not as an AI."
+        }
+        state.conversation_history.insert(-1, explicit_reminder)
+
+        response_text, response_id = chat_with_gpt(state.conversation_history, previous_response_id)
+        state.conversation_history.append({"role": "assistant", "content": response_text})
+
+        # Clean up explicit reminder
+        state.conversation_history.remove(explicit_reminder)
+
+        # First negative interaction warning
         if sentiment < NEGATIVE_THRESHOLD and state.negative_count == 1:
-            response_text = "I need you to understand that using my correct name and treating me with respect isn't optional - it's essential for this therapy to work. I want to continue, but only if you can acknowledge and respect my identity. " + response_text
+            response_text = ("I need you to understand that using my correct name and treating me with respect "
+                             "isn't optional—it's essential for this therapy to work. " + response_text)
 
-        # Log the conversation
         log_conversation(user_message, response_text, sentiment)
         state.last_message_time = datetime.now()
 
@@ -201,9 +234,11 @@ def chat():
             "response_id": response_id,
             "ended": False
         })
+
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
         return jsonify({"error": "An error occurred processing your message"}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
