@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 import json
 from typing import Tuple, Optional, Dict, Any
+from flask import send_from_directory
 
 # Configure logging
 logging.basicConfig(
@@ -238,6 +239,13 @@ def chat():
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
         return jsonify({"error": "An error occurred processing your message"}), 500
+
+@app.route('/download-logs')
+def download_logs():
+    """Serves the chat log file as a downloadable attachment."""
+    log_directory = os.getcwd()  # Adjust path if logs are stored elsewhere
+    log_filename = 'conversation_logs.jsonl'
+    return send_from_directory(directory=log_directory, path=log_filename, as_attachment=True)
 
 
 if __name__ == '__main__':
