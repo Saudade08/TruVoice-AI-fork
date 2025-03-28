@@ -206,6 +206,21 @@ footer {
   background-color: #059669;
 }
 
+.btn-info {
+  background-color: #0ea5e9;
+  color: white;
+}
+
+.btn-info:hover {
+  background-color: #0284c7;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
 /* Messages */
 .message {
   margin: 1rem 0;
