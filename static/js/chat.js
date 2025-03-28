@@ -4,18 +4,34 @@ class ChatManager {
     this.previousResponseId = null;
     this.setupElements();
     this.setupEventListeners();
-    this.checkSessionStatus();
+    // Don't check session status immediately - wait for patient selection
   }
 
   setupElements() {
+    // Welcome screen elements
+    this.welcomeScreen = document.getElementById('welcomeScreen');
+    this.patientCards = document.querySelectorAll('.patient-card');
+    
+    // Chat interface elements
+    this.chatInterface = document.getElementById('chatInterface');
+    this.backButton = document.getElementById('backButton');
+    this.currentPatientName = document.getElementById('currentPatientName');
     this.chatBox = document.getElementById('chatBox');
     this.userInput = document.getElementById('userInput');
     this.sendButton = document.getElementById('sendButton');
     this.restartButton = document.getElementById('restartButton');
     this.typingIndicator = document.getElementById('typingIndicator');
+    this.typingName = document.getElementById('typingName');
   }
 
   setupEventListeners() {
+    // Welcome screen events
+    this.patientCards.forEach(card => {
+      card.addEventListener('click', () => this.selectPatient(card.dataset.patient));
+    });
+    
+    // Chat interface events
+    this.backButton.addEventListener('click', () => this.returnToWelcomeScreen());
     this.sendButton.addEventListener('click', () => this.sendMessage());
     this.userInput.addEventListener('keypress', (e) => this.handleKeyPress(e));
     this.restartButton.addEventListener('click', () => this.restartSession());
@@ -25,6 +41,48 @@ class ChatManager {
       this.userInput.style.height = 'auto';
       this.userInput.style.height = this.userInput.scrollHeight + 'px';
     });
+  }
+
+  selectPatient(patientId) {
+    // Store selected patient
+    this.currentPatient = patientId;
+    
+    // Update UI for selected patient
+    if (patientId === 'monae') {
+      this.currentPatientName.textContent = 'Voice Therapy Session with Monae';
+      this.typingName.textContent = 'Monae';
+    }
+    // Add more patient options here in the future
+    
+    // Switch from welcome screen to chat interface
+    this.welcomeScreen.classList.add('hidden');
+    this.chatInterface.classList.remove('hidden');
+    
+    // Start session
+    this.checkSessionStatus();
+  }
+
+  returnToWelcomeScreen() {
+    // If session is active, confirm before leaving
+    if (!this.isSessionEnded) {
+      if (!confirm("Are you sure you want to end this session?")) {
+        return;
+      }
+    }
+    
+    // Reset chat interface
+    this.chatBox.innerHTML = '';
+    this.isSessionEnded = false;
+    this.previousResponseId = null;
+    
+    // Switch from chat interface to welcome screen
+    this.chatInterface.classList.add('hidden');
+    this.welcomeScreen.classList.remove('hidden');
+    
+    // Enable inputs
+    this.userInput.disabled = false;
+    this.sendButton.disabled = false;
+    this.restartButton.classList.add('hidden');
   }
 
   async checkSessionStatus() {
