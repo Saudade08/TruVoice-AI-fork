@@ -154,8 +154,8 @@ Be expressively stubborn.
         }
 
         initial_prompt = {
-            "role": "system",
-            "content": "Don't respond to this message,  the clinician will start first. "
+            "role": "user",
+            "content": "Greetings. "
         }
 
         messages = [initial_instructions, initial_prompt]
