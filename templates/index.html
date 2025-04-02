@@ -7,37 +7,62 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <header>
-        <h1>Voice Therapy Session with Monae</h1>
-    </header>
-
-    <main>
-        <div id="chatBox" class="chat-container"></div>
-        
-        <div id="typingIndicator" class="typing-indicator hidden">
-            Monae is typing...
+    <div id="profilePage" class="profile-page">
+        <div class="profile-container">
+            <div class="profile-image">
+                <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80" 
+                     alt="Monae's Profile Picture" 
+                     class="profile-pic">
+            </div>
+            <div class="profile-info">
+                <h1>Meet Monae</h1>
+                <p class="profile-description">
+                    Hi, I'm Monae, a 32-year-old woman seeking voice therapy to help feminize my voice. 
+                    I've been on HRT for about 18 months and while I'm happy with most changes, 
+                    my voice still causes me significant dysphoria. I'm hoping to learn proper 
+                    techniques and exercises that can help me develop a more feminine voice that 
+                    feels natural and authentic to who I am.
+                </p>
+                <button id="startChatButton" class="btn btn-primary">
+                    Start Voice Therapy Session
+                </button>
+            </div>
         </div>
+    </div>
 
-        <div class="input-container">
-            <textarea
-                id="userInput"
-                class="chat-input"
-                placeholder="Type your message to start the session..."
-                rows="1"
-                maxlength="500"
-            ></textarea>
-            <button id="sendButton" class="btn btn-primary">Send</button>
-        </div>
+    <div id="chatInterface" class="chat-interface hidden">
+        <header>
+            <h1>Voice Therapy Session with Monae</h1>
+        </header>
 
-        <div class="button-container">
-            <button id="restartButton" class="btn btn-success hidden">
-                Start New Session
-            </button>
-            <button id="downloadButton" class="btn btn-secondary hidden">
-                Download Chat Log
-            </button>
-        </div>
-    </main>
+        <main>
+            <div id="chatBox" class="chat-container"></div>
+            
+            <div id="typingIndicator" class="typing-indicator hidden">
+                Monae is typing...
+            </div>
+
+            <div class="input-container">
+                <textarea
+                    id="userInput"
+                    class="chat-input"
+                    placeholder="Type your message to start the session..."
+                    rows="1"
+                    maxlength="500"
+                ></textarea>
+                <button id="sendButton" class="btn btn-primary">Send</button>
+            </div>
+
+            <div class="button-container">
+                <button id="restartButton" class="btn btn-success hidden">
+                    Start New Session
+                </button>
+                <button id="downloadButton" class="btn btn-secondary hidden">
+                    Download Chat Log
+                </button>
+            </div>
+        </main>
+    </div>
 
     <script>
         let isSessionEnded = false;
@@ -127,6 +152,10 @@
                 const response = await fetch('/start', { method: 'POST' });
                 const data = await response.json();
                 previousResponseId = data.response_id;
+                
+                // Hide profile page and show chat interface
+                document.getElementById('profilePage').classList.add('hidden');
+                document.getElementById('chatInterface').classList.remove('hidden');
             } catch (error) {
                 console.error('Error starting session:', error);
             }
@@ -145,7 +174,10 @@
                     document.getElementById('sendButton').disabled = false;
                     document.getElementById('restartButton').classList.add('hidden');
                     document.getElementById('downloadButton').classList.add('hidden');
-                    await startSession();
+                    
+                    // Show profile page and hide chat interface
+                    document.getElementById('profilePage').classList.remove('hidden');
+                    document.getElementById('chatInterface').classList.add('hidden');
                 }
             } catch (error) {
                 console.error('Error restarting session:', error);
@@ -153,15 +185,13 @@
         }
 
         // Event listeners
+        document.getElementById('startChatButton').addEventListener('click', startSession);
         document.getElementById('userInput').addEventListener('keypress', handleKeyPress);
         document.getElementById('sendButton').addEventListener('click', sendMessage);
         document.getElementById('restartButton').addEventListener('click', restartSession);
         document.getElementById('downloadButton').addEventListener('click', () => {
             window.location.href = '/download-logs';
         });
-
-        // Start the session when the page loads
-        window.onload = startSession;
     </script>
 </body>
 </html>
