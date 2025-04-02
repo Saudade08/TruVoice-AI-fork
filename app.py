@@ -81,7 +81,6 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
         logger.error(f"Error during API call: {e}")
         return "I need to take a break from this session. Thank you for understanding.", None
 
-
 def log_conversation(user_message: str, assistant_response: str, sentiment: float) -> None:
     """Log conversation details for analysis."""
     try:
@@ -101,7 +100,6 @@ def log_conversation(user_message: str, assistant_response: str, sentiment: floa
 def home():
     return render_template('index.html')
 
-
 @app.route('/status')
 def check_status():
     """Check the current session status."""
@@ -119,7 +117,6 @@ def restart_session():
     except Exception as e:
         logger.error(f"Error restarting session: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
-
 
 @app.route('/start', methods=['POST'])
 def start_chat():
@@ -153,29 +150,20 @@ Be expressively stubborn.
 """
         }
 
-        initial_prompt = {
-            "role": "user",
-            "content": "Greetings. "
-        }
-
-        messages = [initial_instructions, initial_prompt]
-
-        response_text, response_id = chat_with_gpt(messages)
-
-        # Set initial conversation history clearly
-        state.conversation_history = messages + [{"role": "assistant", "content": response_text}]
+        # Initialize conversation history with just the instructions
+        state.conversation_history = [initial_instructions]
         state.last_message_time = datetime.now()
 
+        # Return empty response to not show initial message
         return jsonify({
-            "response": response_text,
-            "response_id": response_id,
+            "response": "",
+            "response_id": None,
             "ended": False
         })
 
     except Exception as e:
         logger.error(f"Error starting chat: {e}")
         return jsonify({"error": "Failed to start chat session"}), 500
-
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -247,7 +235,6 @@ def download_logs():
     log_directory = os.getcwd()  # Adjust path if logs are stored elsewhere
     log_filename = 'conversation_logs.jsonl'
     return send_from_directory(directory=log_directory, path=log_filename, as_attachment=True)
-
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
