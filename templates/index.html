@@ -3,72 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TruVision AI - Healthcare Training Simulations</title>
-    <link rel="stylesheet" href="static/styles.css">
+    <title>Voice Therapy Session with Monae</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <header>
-        <h1>Welcome to TruVision AI</h1>
-        <p class="subtitle">Interactive Healthcare Training Simulations</p>
+        <h1>Voice Therapy Session with Monae</h1>
     </header>
 
     <main>
-        <div id="welcomeScreen" class="welcome-container">
-            <h2>Select a Patient to Begin a Session</h2>
-            
-            <div class="patients-grid">
-                <div class="patient-card" data-patient="monae">
-                    <div class="patient-avatar">
-                        <img src="static/images/avatar-placeholder.jpg" alt="Monae">
-                    </div>
-                    <h3>Monae</h3>
-                    <p>32-year-old trans woman seeking voice therapy</p>
-                    <div class="patient-hover-info">
-                        <p>Click to start a voice therapy session with Monae</p>
-                    </div>
-                </div>
-                <!-- Additional patients can be added here in the future -->
-            </div>
+        <div id="chatBox" class="chat-container"></div>
+        
+        <div id="typingIndicator" class="typing-indicator hidden">
+            Monae is typing...
         </div>
 
-        <div id="chatInterface" class="chat-interface hidden">
-            <div class="chat-header">
-                <button id="backButton" class="btn btn-secondary">← Back</button>
-                <h2 id="currentPatientName">Voice Therapy Session with Monae</h2>
-            </div>
-            
-            <div id="chatBox" class="chat-container"></div>
-            
-            <div id="typingIndicator" class="typing-indicator hidden">
-                <span id="typingName">Monae</span> is typing...
-            </div>
+        <div class="input-container">
+            <textarea
+                id="userInput"
+                class="chat-input"
+                placeholder="Type your message to start the session..."
+                rows="1"
+                maxlength="500"
+            ></textarea>
+            <button id="sendButton" class="btn btn-primary">Send</button>
+        </div>
 
-            <div class="input-container">
-                <textarea
-                    id="userInput"
-                    class="chat-input"
-                    placeholder="Type your message..."
-                    rows="1"
-                    maxlength="500"
-                ></textarea>
-                <button id="sendButton" class="btn btn-primary">Send</button>
-            </div>
-
-            <div class="action-buttons">
-                <button id="restartButton" class="btn btn-success hidden">
-                    Start New Session
-                </button>
-                <button id="downloadButton" class="btn btn-info hidden">
-                    Download Conversation
-                </button>
-            </div>
+        <div class="button-container">
+            <button id="restartButton" class="btn btn-success hidden">
+                Start New Session
+            </button>
+            <button id="downloadButton" class="btn btn-secondary hidden">
+                Download Chat Log
+            </button>
         </div>
     </main>
 
-    <footer>
-        <p>© 2025 TruVision AI - Healthcare Simulation Training Platform</p>
-    </footer>
+    <script>
+        let isSessionEnded = false;
+        let previousResponseId = null;
 
-    <script src="static/js/chat.js"></script>
+        async function sendMessage() {
+            if (isSessionEnded) return;
+            
+            const userInput = document.getElementById('userInput');
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML += `
+                <div class="message user-message">
+                    <div class="message-content">${escapeHtml(message)}</div>
+                </div>
+            `;
+
+            userInput.value = '';
+            userInput.disabled = true;
+            document.getElementById('sendButton').disabled = true;
+            document.getElementById('typingIndicator').classList.remove('hidden');
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: message,
+                        previous_response_id: previousResponseId
+                    })
+                });
+                
+                const data = await response.json();
+                previousResponseId = data.response_id;
+
+                if (data.response) {
+                    chatBox.innerHTML += `
+                        <div class="message assistant-message">
+                            <div class="message-content">${escapeHtml(data.response)}</div>
+                        </div>
+                    `;
+                }
+
+                if (data.ended) {
+                    isSessionEnded = true;
+                    chatBox.innerHTML += '<div class="session-ended">Session has ended.</div>';
+                    userInput.disabled = true;
+                    document.getElementById('sendButton').disabled = true;
+                    document.getElementById('restartButton').classList.remove('hidden');
+                    document.getElementById('downloadButton').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                chatBox.innerHTML += `
+                    <div class="message system-message">
+                        <div class="message-content">Error sending message. Please try again.</div>
+                    </div>
+                `;
+            } finally {
+                userInput.disabled = false;
+                document.getElementById('sendButton').disabled = false;
+                document.getElementById('typingIndicator').classList.add('hidden');
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        async function startSession() {
+            try {
+                const response = await fetch('/start', { method: 'POST' });
+                const data = await response.json();
+                previousResponseId = data.response_id;
+            } catch (error) {
+                console.error('Error starting session:', error);
+            }
+        }
+
+        async function restartSession() {
+            try {
+                const response = await fetch('/restart', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    isSessionEnded = false;
+                    previousResponseId = null;
+                    document.getElementById('chatBox').innerHTML = '';
+                    document.getElementById('userInput').disabled = false;
+                    document.getElementById('sendButton').disabled = false;
+                    document.getElementById('restartButton').classList.add('hidden');
+                    document.getElementById('downloadButton').classList.add('hidden');
+                    await startSession();
+                }
+            } catch (error) {
+                console.error('Error restarting session:', error);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('userInput').addEventListener('keypress', handleKeyPress);
+        document.getElementById('sendButton').addEventListener('click', sendMessage);
+        document.getElementById('restartButton').addEventListener('click', restartSession);
+        document.getElementById('downloadButton').addEventListener('click', () => {
+            window.location.href = '/download-logs';
+        });
+
+        // Start the session when the page loads
+        window.onload = startSession;
+    </script>
 </body>
 </html>
