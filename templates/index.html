@@ -10,14 +10,18 @@
     <div id="profilePage" class="profile-page">
         <div class="profile-container">
             <div class="profile-image">
-                <img src="static/images/avatar-placeholder.jpg" 
+                <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80" 
                      alt="Monae's Profile Picture" 
                      class="profile-pic">
             </div>
             <div class="profile-info">
                 <h1>Meet Monae</h1>
                 <p class="profile-description">
-                    I'm Monae, a 32-year-old woman seeking voice therapy to help feminize my voice. 
+                    Hi, I'm Monae, a 32-year-old woman seeking voice therapy to help feminize my voice. 
+                    I've been on HRT for about 18 months and while I'm happy with most changes, 
+                    my voice still causes me significant dysphoria. I'm hoping to learn proper 
+                    techniques and exercises that can help me develop a more feminine voice that 
+                    feels natural and authentic to who I am.
                 </p>
                 <button id="startChatButton" class="btn btn-primary">
                     Start Voice Therapy Session
@@ -50,10 +54,10 @@
             </div>
 
             <div class="button-container">
-                <button id="restartButton" class="btn btn-success hidden">
+                <button id="restartButton" class="btn btn-success">
                     Start New Session
                 </button>
-                <button id="downloadButton" class="btn btn-secondary hidden">
+                <button id="downloadButton" class="btn btn-secondary">
                     Download Chat Log
                 </button>
             </div>
@@ -72,9 +76,15 @@
             if (!message) return;
 
             const chatBox = document.getElementById('chatBox');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // Add user message with bubble styling
             chatBox.innerHTML += `
-                <div class="message user-message">
-                    <div class="message-content">${escapeHtml(message)}</div>
+                <div class="message message-user">
+                    <div class="message-bubble user-bubble">
+                        <p>${escapeHtml(message)}</p>
+                        <span class="message-timestamp">${timestamp}</span>
+                    </div>
                 </div>
             `;
 
@@ -97,9 +107,14 @@
                 previousResponseId = data.response_id;
 
                 if (data.response) {
+                    const assistantTimestamp = new Date().toLocaleTimeString();
+                    // Add assistant message with bubble styling
                     chatBox.innerHTML += `
-                        <div class="message assistant-message">
-                            <div class="message-content">${escapeHtml(data.response)}</div>
+                        <div class="message message-assistant">
+                            <div class="message-bubble assistant-bubble">
+                                <p>${escapeHtml(data.response)}</p>
+                                <span class="message-timestamp">${assistantTimestamp}</span>
+                            </div>
                         </div>
                     `;
                 }
@@ -116,7 +131,9 @@
                 console.error('Error:', error);
                 chatBox.innerHTML += `
                     <div class="message system-message">
-                        <div class="message-content">Error sending message. Please try again.</div>
+                        <div class="message-bubble system-bubble">
+                            <p>Error sending message. Please try again.</p>
+                        </div>
                     </div>
                 `;
             } finally {
