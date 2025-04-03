@@ -124,7 +124,7 @@ h1 {
     border-radius: 6px;
     cursor: pointer;
     font-size: 1rem;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
 }
 
 .btn-primary {
@@ -134,11 +134,13 @@ h1 {
 
 .btn-primary:hover {
     background-color: #1d4ed8;
+    transform: translateY(-1px);
 }
 
 .btn-primary:disabled {
     background-color: #9ca3af;
     cursor: not-allowed;
+    transform: none;
 }
 
 .btn-success {
@@ -148,6 +150,7 @@ h1 {
 
 .btn-success:hover {
     background-color: #059669;
+    transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -157,6 +160,7 @@ h1 {
 
 .btn-secondary:hover {
     background-color: #4b5563;
+    transform: translateY(-1px);
 }
 
 /* Messages */
@@ -175,32 +179,60 @@ h1 {
     }
 }
 
+/* Message bubbles */
+.message-bubble {
+    display: inline-block;
+    padding: 0.75rem 1rem;
+    border-radius: 16px;
+    max-width: 80%;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.message-bubble p {
+    margin: 0;
+    line-height: 1.4;
+}
+
 .message-user {
     text-align: right;
 }
 
-.message-content {
-    display: inline-block;
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
-    max-width: 80%;
-    position: relative;
-}
-
-.message-user .message-content {
+.user-bubble {
     background-color: #2563eb;
     color: white;
+    margin-left: auto;
+    border-bottom-right-radius: 4px;
 }
 
-.message-assistant .message-content {
+.assistant-bubble {
     background-color: #f3f4f6;
     color: #1f2937;
+    margin-right: auto;
+    border-bottom-left-radius: 4px;
 }
 
+.system-bubble {
+    background-color: #fee2e2;
+    color: #dc2626;
+    margin: 0 auto;
+    text-align: center;
+}
+
+/* Message timestamps */
 .message-timestamp {
+    display: block;
     font-size: 0.75rem;
-    color: #6b7280;
     margin-top: 0.25rem;
+    opacity: 0.7;
+}
+
+.message-user .message-timestamp {
+    color: #e5e7eb;
+}
+
+.message-assistant .message-timestamp {
+    color: #6b7280;
 }
 
 /* Status indicators */
@@ -208,6 +240,10 @@ h1 {
     padding: 0.5rem;
     color: #6b7280;
     font-style: italic;
+    text-align: center;
+    background: rgba(255,255,255,0.8);
+    border-radius: 6px;
+    margin: 0.5rem 0;
 }
 
 .session-ended {
@@ -218,6 +254,7 @@ h1 {
     padding: 1rem;
     background-color: #fee2e2;
     border-radius: 6px;
+    animation: fadeIn 0.3s ease forwards;
 }
 
 /* Utils */
@@ -239,5 +276,9 @@ h1 {
     .profile-pic {
         width: 150px;
         height: 150px;
+    }
+
+    .message-bubble {
+        max-width: 90%;
     }
 }
