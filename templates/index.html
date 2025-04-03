@@ -10,14 +10,18 @@
     <div id="profilePage" class="profile-page">
         <div class="profile-container">
             <div class="profile-image">
-                <img src="static/images/avatar-placeholder.jpg" 
+                <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80" 
                      alt="Monae's Profile Picture" 
                      class="profile-pic">
             </div>
             <div class="profile-info">
                 <h1>Meet Monae</h1>
                 <p class="profile-description">
-                    Hi, I'm Monae, a 32-year-old woman seeking voice therapy to help feminize my voice.
+                    Hi, I'm Monae, a 32-year-old woman seeking voice therapy to help feminize my voice. 
+                    I've been on HRT for about 18 months and while I'm happy with most changes, 
+                    my voice still causes me significant dysphoria. I'm hoping to learn proper 
+                    techniques and exercises that can help me develop a more feminine voice that 
+                    feels natural and authentic to who I am.
                 </p>
                 <button id="startChatButton" class="btn btn-primary">
                     Start Voice Therapy Session
@@ -45,6 +49,7 @@
                     placeholder="Type your message to start the session..."
                     rows="1"
                     maxlength="500"
+                    autofocus
                 ></textarea>
                 <button id="sendButton" class="btn btn-primary">Send</button>
             </div>
@@ -63,6 +68,11 @@
     <script>
         let isSessionEnded = false;
         let previousResponseId = null;
+
+        function focusInput() {
+            const userInput = document.getElementById('userInput');
+            userInput.focus();
+        }
 
         async function sendMessage() {
             if (isSessionEnded) return;
@@ -122,6 +132,11 @@
                     document.getElementById('sendButton').disabled = true;
                     document.getElementById('restartButton').classList.remove('hidden');
                     document.getElementById('downloadButton').classList.remove('hidden');
+                } else {
+                    // Auto-focus the input after the response
+                    userInput.disabled = false;
+                    document.getElementById('sendButton').disabled = false;
+                    focusInput();
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -165,6 +180,8 @@
                 // Hide profile page and show chat interface
                 document.getElementById('profilePage').classList.add('hidden');
                 document.getElementById('chatInterface').classList.remove('hidden');
+                // Focus the input when starting the session
+                focusInput();
             } catch (error) {
                 console.error('Error starting session:', error);
             }
