@@ -64,7 +64,7 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
     """Generate response using OpenAI's Responses API with structured messages."""
     try:
         response = client.responses.create(
-            model="gpt-4.5-preview",
+            model="gpt-4o",
             input=messages,
             previous_response_id=previous_response_id,
             timeout=REQUEST_TIMEOUT
