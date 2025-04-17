@@ -68,7 +68,7 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
             input=messages,
             previous_response_id=previous_response_id,
             timeout=REQUEST_TIMEOUT,
-            temperature=0.5
+            temperature=0.8
         )
         
         # Safely extract and concatenate text outputs
