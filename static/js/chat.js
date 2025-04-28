@@ -51,7 +51,7 @@ class ChatManager {
     
     // Update UI for selected patient
     if (patientId === 'monae') {
-      this.currentPatientName.textContent = 'Voice Therapy Session with Monae';
+      this.currentPatientName.textContent = 'Voice Interview Session with Monae';
       this.typingName.textContent = 'Monae';
     }
     // Add more patient options here in the future
