@@ -214,8 +214,8 @@ def chat():
         state.conversation_history.remove(explicit_reminder)
 
         # First negative interaction warning
-        if sentiment < NEGATIVE_THRESHOLD and state.negative_count == 1:
-            response_text = (response_text)
+        #if sentiment < NEGATIVE_THRESHOLD and state.negative_count == 1:
+         #   response_text = (response_text)
 
         log_conversation(user_message, response_text, sentiment)
         state.last_message_time = datetime.now()
