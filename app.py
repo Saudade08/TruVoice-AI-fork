@@ -24,7 +24,7 @@ app = Flask(__name__)
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Constants
-NEGATIVE_THRESHOLD = -0.3
+NEGATIVE_THRESHOLD = -3
 MAX_MESSAGE_LENGTH = 500
 REQUEST_TIMEOUT = 10  # seconds
 
@@ -215,8 +215,7 @@ def chat():
 
         # First negative interaction warning
         if sentiment < NEGATIVE_THRESHOLD and state.negative_count == 1:
-            response_text = ("I need you to understand that using my correct name and treating me with respect "
-                             "isn't optional—it's essential for this therapy to work. " + response_text)
+            response_text = (response_text)
 
         log_conversation(user_message, response_text, sentiment)
         state.last_message_time = datetime.now()
