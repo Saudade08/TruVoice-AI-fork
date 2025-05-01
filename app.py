@@ -24,7 +24,7 @@ app = Flask(__name__)
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Constants
-NEGATIVE_THRESHOLD = -1
+NEGATIVE_THRESHOLD = -.3
 MAX_MESSAGE_LENGTH = 500
 REQUEST_TIMEOUT = 10  # seconds
 
