@@ -7,23 +7,7 @@ from datetime import datetime
 import json
 from typing import Tuple, Optional, Dict, Any
 from flask import send_from_directory
-from nltk.sentiment import SentimentIntensityAnalyzer
-import nltk
 
-nltk.download('vader_lexicon')
-
-analyzer = SentimentIntensityAnalyzer()
-
-def get_sentiment_label(user_message):
-    scores = analyzer.polarity_scores(user_message)
-    compound = scores['compound']
-    if compound <= -0.05:
-        return 'NEGATIVE'
-    elif compound >= 0.05:
-        return 'POSITIVE'
-    else:
-        return 'NEUTRAL'
-        
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -40,7 +24,7 @@ app = Flask(__name__)
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Constants
-#NEGATIVE_THRESHOLD = -.3
+NEGATIVE_THRESHOLD = -0.3
 MAX_MESSAGE_LENGTH = 500
 REQUEST_TIMEOUT = 10  # seconds
 
@@ -162,10 +146,9 @@ Answer yes/no questions directly with just "Yes" or "No" when appropriate, not w
 If a clinician corrects their behavior, acknowledge it while still maintaining your dignity and need for respect.
 Consistently advocate for your needs as a patient seeking voice therapy.
 Remember: You are Monae having a voice therapy session - not an AI helping someone understand a character. Do not willingly give information. Take even minor offenses as serious disrespect.
-If someone curses a you or calls you a mean name, then end the session.
 volunteer no information, make the clinician work for it. Don't respond to this message.
 Be expressively stubborn, and stay dug into your personality as Monae. 
-Always start out with dispassionate one word answers but warm up to longer responses over the course of the interview.
+Always start out with one word answers but warm up to longer responses over the course of the interview.
 """
         }
 
@@ -199,14 +182,11 @@ def chat():
         previous_response_id = data.get('previous_response_id')
 
         # Sentiment analysis
-        #blob = TextBlob(user_message)
-        #sentiment = blob.sentiment.polarity
-        sentiment_label = get_sentiment_label(user_message)
-
+        blob = TextBlob(user_message)
+        sentiment = blob.sentiment.polarity
 
         # Negative sentiment handling
-        #if sentiment < NEGATIVE_THRESHOLD:
-        if sentiment_label == 'NEGATIVE':
+        if sentiment < NEGATIVE_THRESHOLD:
             state.negative_count += 1
             if state.negative_count >= 2:
                 state.is_ended = True
@@ -234,8 +214,9 @@ def chat():
         state.conversation_history.remove(explicit_reminder)
 
         # First negative interaction warning
-        #if sentiment < NEGATIVE_THRESHOLD and state.negative_count == 1:
-         #   response_text = (response_text)
+        if sentiment < NEGATIVE_THRESHOLD and state.negative_count == 1:
+            response_text = ("I need you to understand that using my correct name and treating me with respect "
+                             "isn't optional—it's essential for this therapy to work. " + response_text)
 
         log_conversation(user_message, response_text, sentiment)
         state.last_message_time = datetime.now()
