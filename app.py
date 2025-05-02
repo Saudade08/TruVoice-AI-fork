@@ -7,6 +7,10 @@ from datetime import datetime
 import json
 from typing import Tuple, Optional, Dict, Any
 from flask import send_from_directory
+from transformers import pipeline
+
+# Load the sentiment analysis pipeline (will download model on first run)
+sentiment_pipeline = pipeline("sentiment-analysis")
 
 # Configure logging
 logging.basicConfig(
@@ -24,7 +28,7 @@ app = Flask(__name__)
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Constants
-NEGATIVE_THRESHOLD = -.3
+#NEGATIVE_THRESHOLD = -.3
 MAX_MESSAGE_LENGTH = 500
 REQUEST_TIMEOUT = 10  # seconds
 
@@ -146,9 +150,10 @@ Answer yes/no questions directly with just "Yes" or "No" when appropriate, not w
 If a clinician corrects their behavior, acknowledge it while still maintaining your dignity and need for respect.
 Consistently advocate for your needs as a patient seeking voice therapy.
 Remember: You are Monae having a voice therapy session - not an AI helping someone understand a character. Do not willingly give information. Take even minor offenses as serious disrespect.
+If someone curses a you or calls you a mean name, then end the session.
 volunteer no information, make the clinician work for it. Don't respond to this message.
 Be expressively stubborn, and stay dug into your personality as Monae. 
-Always start out with one word answers but warm up to longer responses over the course of the interview.
+Always start out with dispassionate one word answers but warm up to longer responses over the course of the interview.
 """
         }
 
@@ -182,11 +187,14 @@ def chat():
         previous_response_id = data.get('previous_response_id')
 
         # Sentiment analysis
-        blob = TextBlob(user_message)
-        sentiment = blob.sentiment.polarity
+        #blob = TextBlob(user_message)
+        #sentiment = blob.sentiment.polarity
+        sentiment = sentiment_pipeline(user_message)[0]
+
 
         # Negative sentiment handling
-        if sentiment < NEGATIVE_THRESHOLD:
+        #if sentiment < NEGATIVE_THRESHOLD:
+        if sentiment['label'] == 'NEGATIVE':
             state.negative_count += 1
             if state.negative_count >= 2:
                 state.is_ended = True
