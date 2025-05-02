@@ -7,11 +7,23 @@ from datetime import datetime
 import json
 from typing import Tuple, Optional, Dict, Any
 from flask import send_from_directory
-from transformers import pipeline
+from nltk.sentiment import SentimentIntensityAnalyzer
+import nltk
 
-# Load the sentiment analysis pipeline (will download model on first run)
-sentiment_pipeline = pipeline("sentiment-analysis")
+nltk.download('vader_lexicon')
 
+analyzer = SentimentIntensityAnalyzer()
+
+def get_sentiment_label(user_message):
+    scores = analyzer.polarity_scores(user_message)
+    compound = scores['compound']
+    if compound <= -0.05:
+        return 'NEGATIVE'
+    elif compound >= 0.05:
+        return 'POSITIVE'
+    else:
+        return 'NEUTRAL'
+        
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -189,12 +201,12 @@ def chat():
         # Sentiment analysis
         #blob = TextBlob(user_message)
         #sentiment = blob.sentiment.polarity
-        sentiment = sentiment_pipeline(user_message)[0]
+        sentiment_label = get_sentiment_label(user_message)
 
 
         # Negative sentiment handling
         #if sentiment < NEGATIVE_THRESHOLD:
-        if sentiment['label'] == 'NEGATIVE':
+        if sentiment_label == 'NEGATIVE':
             state.negative_count += 1
             if state.negative_count >= 2:
                 state.is_ended = True
