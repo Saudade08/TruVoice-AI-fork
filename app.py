@@ -217,6 +217,7 @@ def chat():
         if sentiment < NEGATIVE_THRESHOLD and state.negative_count == 1:
             response_text = ("I need you to understand that using my correct name and treating me with respect "
                              "isn't optional—it's essential for this therapy to work. " + response_text)
+            state.negative_count +=.1
 
         log_conversation(user_message, response_text, sentiment)
         state.last_message_time = datetime.now()
