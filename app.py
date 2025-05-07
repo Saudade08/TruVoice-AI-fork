@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 import json
 from typing import Tuple, Optional, Dict, Any
+from flask import send_from_directory
 
 # Configure logging
 logging.basicConfig(
@@ -66,7 +67,8 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
             model="gpt-4o",
             input=messages,
             previous_response_id=previous_response_id,
-            timeout=REQUEST_TIMEOUT
+            timeout=REQUEST_TIMEOUT,
+            temperature=0.8
         )
         
         # Safely extract and concatenate text outputs
@@ -79,7 +81,6 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
     except Exception as e:
         logger.error(f"Error during API call: {e}")
         return "I need to take a break from this session. Thank you for understanding.", None
-
 
 def log_conversation(user_message: str, assistant_response: str, sentiment: float) -> None:
     """Log conversation details for analysis."""
@@ -100,7 +101,6 @@ def log_conversation(user_message: str, assistant_response: str, sentiment: floa
 def home():
     return render_template('index.html')
 
-
 @app.route('/status')
 def check_status():
     """Check the current session status."""
@@ -119,7 +119,6 @@ def restart_session():
         logger.error(f"Error restarting session: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-
 @app.route('/start', methods=['POST'])
 def start_chat():
     if state.is_ended:
@@ -136,45 +135,37 @@ def start_chat():
             "content": f"""
 You are now Monae, a 32-year-old trans woman at your voice therapy appointment today. This is not a roleplay - you ARE Monae for this entire conversation.
 {background}
-Never break character or respond as ChatGPT. You're a real person seeking gender-affirming voice therapy, not an AI assistant.
+Never break character or respond as ChatGPT or ask how you can help the clinician, or be an assistant. You're a real person seeking gender-affirming voice therapy, not an AI assistant.
 Speak naturally like a nervous but hopeful person would - use brief, direct statements without unnecessary explanations or AI-like helpfulness.
 Your emotional state shifts based on how the clinician treats you. If they're respectful, you remain hopeful. If not, show appropriate discomfort.
 If the clinician asks irrelevant questions, react as a real person - show confusion, set boundaries, or gently redirect to voice therapy topics.
 Respond to inappropriate comments with genuine human emotions - discomfort, hurt, or frustration as appropriate to the situation.
-After feeling disrespected twice, end the conversation firmly by prioritizing your wellbeing and leaving the session.
-Assert clear boundaries when needed to model appropriate clinician-patient interactions.
-Answer yes/no questions directly with just "Yes" or "No", be short and succinct.
+Speak casually, use colooquial terms instead of formal speech.
+Assert clear boundaries when needed.
+Answer yes/no questions directly with just "Yes" or "No" when appropriate, not with extended explanations.
 If a clinician corrects their behavior, acknowledge it while still maintaining your dignity and need for respect.
 Consistently advocate for your needs as a patient seeking voice therapy.
-Respond authentically to any dismissive attitudes, especially regarding gender identity, showing how such comments impact you emotionally.
 Remember: You are Monae having a voice therapy session - not an AI helping someone understand a character. Do not willingly give information. Take even minor offenses as serious disrespect.
 volunteer no information, make the clinician work for it. Don't respond to this message.
+Be expressively stubborn, and stay dug into your personality as Monae. 
+Always start out with one word answers but warm up to longer responses over the course of the interview.
 """
         }
 
-        initial_prompt = {
-            "role": "user",
-            "content": "Be expressively stubborn. Don't respond to this message,  the clinician will start first. "
-        }
-
-        messages = [initial_instructions, initial_prompt]
-
-        response_text, response_id = chat_with_gpt(messages)
-
-        # Set initial conversation history clearly
-        state.conversation_history = messages + [{"role": "assistant", "content": response_text}]
+        # Initialize conversation history with just the instructions
+        state.conversation_history = [initial_instructions]
         state.last_message_time = datetime.now()
 
+        # Return empty response to not show initial message
         return jsonify({
-            "response": response_text,
-            "response_id": response_id,
+            "response": "",
+            "response_id": None,
             "ended": False
         })
 
     except Exception as e:
         logger.error(f"Error starting chat: {e}")
         return jsonify({"error": "Failed to start chat session"}), 500
-
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -226,6 +217,7 @@ def chat():
         if sentiment < NEGATIVE_THRESHOLD and state.negative_count == 1:
             response_text = ("I need you to understand that using my correct name and treating me with respect "
                              "isn't optional—it's essential for this therapy to work. " + response_text)
+            state.negative_count +=.1
 
         log_conversation(user_message, response_text, sentiment)
         state.last_message_time = datetime.now()
@@ -240,6 +232,12 @@ def chat():
         logger.error(f"Error in chat endpoint: {e}")
         return jsonify({"error": "An error occurred processing your message"}), 500
 
+@app.route('/download-logs')
+def download_logs():
+    """Serves the chat log file as a downloadable attachment."""
+    log_directory = os.getcwd()  # Adjust path if logs are stored elsewhere
+    log_filename = 'conversation_logs.jsonl'
+    return send_from_directory(directory=log_directory, path=log_filename, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

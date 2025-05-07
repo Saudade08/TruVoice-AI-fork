@@ -3,37 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Therapy Session with Monae</title>
-    <link rel="stylesheet" href="static/styles.css">
+    <title>Initial Voice Intake Interview with Monae</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <header>
-        <h1>Voice Therapy Session with Monae</h1>
-    </header>
-
-    <main>
-        <div id="chatBox" class="chat-container"></div>
-        
-        <div id="typingIndicator" class="typing-indicator hidden">
-            Monae is typing...
+    <div id="profilePage" class="profile-page">
+        <div class="profile-container">
+            <div class="profile-image">
+                <img src="static/images/avatar-placeholder.jpg" 
+                     alt="Monae's Profile Picture" 
+                     class="profile-pic">
+            </div>
+            <div class="profile-info">
+                <h1>Meet Monae</h1>
+                <p class="profile-description">
+                    Hi, I'm Monae, a 32-year-old woman seeking voice therapy to help feminize my voice. 
+                </p>
+                <button id="startChatButton" class="btn btn-primary">
+                    Start Voice Intake Interview
+                </button>
+            </div>
         </div>
+    </div>
 
-        <div class="input-container">
-            <textarea
-                id="userInput"
-                class="chat-input"
-                placeholder="Type your message..."
-                rows="1"
-                maxlength="500"
-            ></textarea>
-            <button id="sendButton" class="btn btn-primary">Send</button>
-        </div>
+    <div id="chatInterface" class="chat-interface hidden">
+        <header>
+            <h1>Initial Voice Intake Interview</h1>
+        </header>
 
-        <button id="restartButton" class="btn btn-success hidden">
-            Start New Session
-        </button>
-    </main>
+        <main>
+            <div id="chatBox" class="chat-container"></div>
+            
+            <div id="typingIndicator" class="typing-indicator hidden">
+                Monae is typing...
+            </div>
 
-    <script src="static/js/chat.js"></script>
+            <div class="input-container">
+                <textarea
+                    id="userInput"
+                    class="chat-input"
+                    placeholder="Type your message to start the session..."
+                    rows="1"
+                    maxlength="500"
+                    autofocus
+                ></textarea>
+                <button id="sendButton" class="btn btn-primary">Send</button>
+            </div>
+
+            <div class="button-container">
+                <button id="restartButton" class="btn btn-success">
+                    Start New Session
+                </button>
+                <button id="downloadButton" class="btn btn-secondary">
+                    Download Chat Log
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let isSessionEnded = false;
+        let previousResponseId = null;
+
+        function focusInput() {
+            const userInput = document.getElementById('userInput');
+            userInput.focus();
+        }
+
+        async function sendMessage() {
+            if (isSessionEnded) return;
+            
+            const userInput = document.getElementById('userInput');
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            const chatBox = document.getElementById('chatBox');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // Add user message with bubble styling
+            chatBox.innerHTML += `
+                <div class="message message-user">
+                    <div class="message-bubble user-bubble">
+                        <p>${escapeHtml(message)}</p>
+                        <span class="message-timestamp">${timestamp}</span>
+                    </div>
+                </div>
+            `;
+
+            userInput.value = '';
+            userInput.disabled = true;
+            document.getElementById('sendButton').disabled = true;
+            document.getElementById('typingIndicator').classList.remove('hidden');
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: message,
+                        previous_response_id: previousResponseId
+                    })
+                });
+                
+                const data = await response.json();
+                previousResponseId = data.response_id;
+
+                if (data.response) {
+                    const assistantTimestamp = new Date().toLocaleTimeString();
+                    // Add assistant message with bubble styling
+                    chatBox.innerHTML += `
+                        <div class="message message-assistant">
+                            <div class="message-bubble assistant-bubble">
+                                <p>${escapeHtml(data.response)}</p>
+                                <span class="message-timestamp">${assistantTimestamp}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (data.ended) {
+                    isSessionEnded = true;
+                    chatBox.innerHTML += '<div class="session-ended">Session has ended.</div>';
+                    userInput.disabled = true;
+                    document.getElementById('sendButton').disabled = true;
+                    document.getElementById('restartButton').classList.remove('hidden');
+                    document.getElementById('downloadButton').classList.remove('hidden');
+                } else {
+                    // Auto-focus the input after the response
+                    userInput.disabled = false;
+                    document.getElementById('sendButton').disabled = false;
+                    focusInput();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                chatBox.innerHTML += `
+                    <div class="message system-message">
+                        <div class="message-bubble system-bubble">
+                            <p>Error sending message. Please try again.</p>
+                        </div>
+                    </div>
+                `;
+            } finally {
+                userInput.disabled = false;
+                document.getElementById('sendButton').disabled = false;
+                document.getElementById('typingIndicator').classList.add('hidden');
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        async function startSession() {
+            try {
+                const response = await fetch('/start', { method: 'POST' });
+                const data = await response.json();
+                previousResponseId = data.response_id;
+                
+                // Hide profile page and show chat interface
+                document.getElementById('profilePage').classList.add('hidden');
+                document.getElementById('chatInterface').classList.remove('hidden');
+                // Focus the input when starting the session
+                focusInput();
+            } catch (error) {
+                console.error('Error starting session:', error);
+            }
+        }
+
+        async function restartSession() {
+            try {
+                const response = await fetch('/restart', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    isSessionEnded = false;
+                    previousResponseId = null;
+                    document.getElementById('chatBox').innerHTML = '';
+                    document.getElementById('userInput').disabled = false;
+                    document.getElementById('sendButton').disabled = false;
+                    document.getElementById('restartButton').classList.add('hidden');
+                    document.getElementById('downloadButton').classList.add('hidden');
+                    
+                    // Show profile page and hide chat interface
+                    document.getElementById('profilePage').classList.remove('hidden');
+                    document.getElementById('chatInterface').classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('Error restarting session:', error);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('startChatButton').addEventListener('click', startSession);
+        document.getElementById('userInput').addEventListener('keypress', handleKeyPress);
+        document.getElementById('sendButton').addEventListener('click', sendMessage);
+        document.getElementById('restartButton').addEventListener('click', restartSession);
+        document.getElementById('downloadButton').addEventListener('click', () => {
+            window.location.href = '/download-logs';
+        });
+    </script>
 </body>
 </html>
