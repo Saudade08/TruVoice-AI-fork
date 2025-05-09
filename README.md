@@ -21,7 +21,7 @@ pip install -r requirements.txt
 Usage
 To start the application, run the following command in the terminal:
 
-python main.py
+python app.py
 
 Follow the on-screen prompts to interact with Monae. Type 'quit' or 'exit' to end the conversation.
 
