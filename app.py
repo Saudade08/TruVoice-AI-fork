@@ -126,6 +126,7 @@ def log_conversation(user_message: str, assistant_response: str, sentiment: floa
 
 @app.route('/')
 def home():
+    session.clear()
     return render_template('index.html')
 
 @app.route('/status')
