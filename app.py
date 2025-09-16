@@ -23,12 +23,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize Flask and OpenAI
+REQUEST_TIMEOUT = 10  # seconds
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 db = SQLAlchemy(app)
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), timeout=REQUEST_TIMEOUT)
 
 class ChatSession(db.Model):
     id = db.Column(db.String(36), primary_key=True)
@@ -52,7 +54,6 @@ with app.app_context():
 # Constants
 NEGATIVE_THRESHOLD = -0.3
 MAX_MESSAGE_LENGTH = 500
-REQUEST_TIMEOUT = 10  # seconds
 MAX_CONVERSATION_TURNS = 20  # Maximum back-and-forth exchanges
 MAX_INPUT_TOKENS = 1000  # Maximum tokens for user input
 MAX_OUTPUT_TOKENS = 500  # Maximum tokens for AI response
@@ -94,7 +95,6 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
         response = client.chat.completions.create(
             model="gpt-5",  # Changed to GPT-5
             messages=messages,
-            timeout=REQUEST_TIMEOUT,
             temperature=0.8,
             max_tokens=MAX_OUTPUT_TOKENS
         )
@@ -331,3 +331,4 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
