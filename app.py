@@ -134,7 +134,8 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
             system_text = SYSTEM_PROMPT.replace("{BACKGROUND}", background or "")
             system_block = {
                 "role": "system",
-                "content": [{"type": "input_text", "text": system_text}]
+                "content": [{"type": "input_text", "text": system_text}],
+                "cache_control": {"type": "ephemeral"}  # cache the static persona prompt
             }
             input_blocks.append(system_block)
 
@@ -345,6 +346,7 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
 
 
