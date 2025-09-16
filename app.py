@@ -93,7 +93,7 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
     """Generate response using OpenAI's Chat Completions API with GPT-5."""
     try:
         response = client.chat.completions.create(
-            model="gpt-5",  # Changed to GPT-5
+            model="gpt-5-chat-latest",  # Changed to GPT-5
             messages=messages,
             temperature=0.8,
             max_completion_tokens=MAX_OUTPUT_TOKENS
@@ -331,5 +331,6 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
 
