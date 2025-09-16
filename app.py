@@ -120,15 +120,14 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
                         "role": "user",
                         "content": [{"type": "input_text", "text": m["content"]}]
                     })
-            # Make the call referencing prior server-side state
-            try:
-                resp = client.responses.create(
-                    model="gpt-5-chat-latest",
-                    input=input_blocks,
-                    max_output_tokens=MAX_OUTPUT_TOKENS,
-                    stop=["\n\n"],
-                    temperature=0.8
-                )
+
+            resp = client.responses.create(
+                model="gpt-5-chat-latest",
+                input=input_blocks,
+                max_output_tokens=MAX_OUTPUT_TOKENS,
+                stop=["\n\n"],
+                temperature=0.8
+            )
         else:
             # First turn: include cacheable system block + any user message(s)
             # Build system block once, with background substituted
@@ -148,14 +147,13 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
                         "content": [{"type": "input_text", "text": m["content"]}]
                     })
 
-            try:
-                resp = client.responses.create(
-                    model="gpt-5-chat-latest",
-                    input=input_blocks,
-                    max_output_tokens=MAX_OUTPUT_TOKENS,
-                    stop=["\n\n"],
-                    temperature=0.8
-                )
+            resp = client.responses.create(
+                model="gpt-5-chat-latest",
+                input=input_blocks,
+                max_output_tokens=MAX_OUTPUT_TOKENS,
+                stop=["\n\n"],
+                temperature=0.8
+            )
 
         # Parse text robustly
         text = ""
@@ -350,3 +348,4 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
