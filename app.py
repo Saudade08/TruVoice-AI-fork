@@ -9,6 +9,7 @@ from typing import Tuple, Optional, Dict, Any
 from flask import send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 import uuid
+import tiktoken
 
 # Configure logging
 logging.basicConfig(
@@ -52,6 +53,9 @@ with app.app_context():
 NEGATIVE_THRESHOLD = -0.3
 MAX_MESSAGE_LENGTH = 500
 REQUEST_TIMEOUT = 10  # seconds
+MAX_CONVERSATION_TURNS = 20  # Maximum back-and-forth exchanges
+MAX_INPUT_TOKENS = 1000  # Maximum tokens for user input
+MAX_OUTPUT_TOKENS = 500  # Maximum tokens for AI response
 
 def clean_text(text: str) -> str:
     """Clean up text by removing special characters and extra whitespace."""
@@ -75,23 +79,28 @@ def load_background(file_path: str) -> str:
         logger.error(f"Error loading background file: {e}")
         return ""
 
-def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
-    """Generate response using OpenAI's Responses API with structured messages."""
+def count_tokens(text: str, model: str = "gpt-4") -> int:
+    """Count tokens in text using tiktoken."""
     try:
-        response = client.responses.create(
-            model="gpt-5",
-            input=messages,
-            previous_response_id=previous_response_id,
+        encoding = tiktoken.encoding_for_model(model)
+        return len(encoding.encode(text))
+    except:
+        # Fallback: approximate token count (4 chars ≈ 1 token)
+        return len(text) // 4
+
+def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
+    """Generate response using OpenAI's Chat Completions API with GPT-5."""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-5",  # Changed to GPT-5
+            messages=messages,
             timeout=REQUEST_TIMEOUT,
-            temperature=0.8
+            temperature=0.8,
+            max_tokens=MAX_OUTPUT_TOKENS
         )
         
-        # Safely extract and concatenate text outputs
-        response_text = ''.join(
-            content.text for item in response.output if item.type == 'message'
-            for content in item.content if content.type == 'output_text'
-        )
-        return response_text, response.id
+        response_text = response.choices[0].message.content
+        return response_text, None  # response.id not available in chat completions
     
     except Exception as e:
         logger.error(f"Error during API call: {e}")
@@ -132,7 +141,10 @@ def home():
 @app.route('/status')
 def check_status():
     """Check the current session status."""
-    return jsonify({"ended": session.get('is_ended', False)})
+    return jsonify({
+        "ended": session.get('is_ended', False),
+        "turns_remaining": MAX_CONVERSATION_TURNS - session.get('conversation_turns', 0)
+    })
 
 @app.route('/restart', methods=['POST'])
 def restart_session():
@@ -157,7 +169,7 @@ def start_chat():
     try:
         background = load_background("background.txt")
         initial_instructions = {
-            "role": "developer",
+            "role": "system",
             "content": f"""
 You are now Monae, a 32-year-old trans woman at your voice therapy appointment today. This is not a roleplay - you ARE Monae for this entire conversation.
 {background}
@@ -182,6 +194,7 @@ Always start out with one word answers but warm up to longer responses over the 
         session['conversation_history'] = [initial_instructions]
         session['negative_count'] = 0
         session['is_ended'] = False
+        session['conversation_turns'] = 0
         session['last_message_time'] = datetime.now().isoformat()
 
         # Return empty response to not show initial message
@@ -207,7 +220,25 @@ def chat():
     try:
         data = request.json
         user_message = data['message'][:MAX_MESSAGE_LENGTH]
-        previous_response_id = data.get('previous_response_id')
+        
+        # Check input token limit
+        input_tokens = count_tokens(user_message)
+        if input_tokens > MAX_INPUT_TOKENS:
+            return jsonify({
+                "response": "Your message is too long. Please keep it shorter and more focused.",
+                "response_id": None,
+                "ended": False
+            })
+
+        # Check conversation turn limit
+        conversation_turns = session.get('conversation_turns', 0)
+        if conversation_turns >= MAX_CONVERSATION_TURNS:
+            session['is_ended'] = True
+            return jsonify({
+                "response": "We've reached the end of our session time. Thank you for the conversation. I appreciate your time and will schedule a follow-up if needed.",
+                "response_id": None,
+                "ended": True
+            })
 
         # Get data from session
         conversation_history = session.get('conversation_history', [])
@@ -236,25 +267,24 @@ def chat():
 
         # Explicit reminder to stay in character
         explicit_reminder = {
-            "role": "developer",
+            "role": "system",
             "content": "You are strictly Monae, never break character, respond naturally as a patient, not as an AI."
         }
-        conversation_history.insert(-1, explicit_reminder)
+        conversation_history.append(explicit_reminder)
 
-        response_text, response_id = chat_with_gpt(conversation_history, previous_response_id)
+        response_text, response_id = chat_with_gpt(conversation_history)
+        
+        # Remove the explicit reminder after getting response
+        conversation_history.pop()  # Remove the last added reminder
         conversation_history.append({"role": "assistant", "content": response_text})
-
-        # Clean up explicit reminder
-        conversation_history.remove(explicit_reminder)
 
         # First negative interaction warning
         if sentiment < NEGATIVE_THRESHOLD and negative_count == 1:
             response_text = ("I need you to understand that using my correct name and treating me with respect "
                              "isn't optional—it's essential for this therapy to work. " + response_text)
-            negative_count += 0.1
-            session['negative_count'] = negative_count
 
-        # Save updated conversation history back to session
+        # Update conversation turn count
+        session['conversation_turns'] = conversation_turns + 1
         session['conversation_history'] = conversation_history
         session['last_message_time'] = datetime.now().isoformat()
 
@@ -263,7 +293,8 @@ def chat():
         return jsonify({
             "response": response_text,
             "response_id": response_id,
-            "ended": False
+            "ended": False,
+            "turns_remaining": MAX_CONVERSATION_TURNS - (conversation_turns + 1)
         })
 
     except Exception as e:
@@ -300,5 +331,3 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
-
-
