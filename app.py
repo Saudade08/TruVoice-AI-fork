@@ -90,12 +90,6 @@ def count_tokens(text: str, model: str = "gpt-4") -> int:
         return len(text) // 4
 
 def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
-    """
-    Generate response using OpenAI's Responses API with GPT-5.
-    - Caches the first system message (ephemeral cache).
-    - Uses max_completion_tokens (Responses API).
-    - Adds a gentle stop to curb verbosity.
-    """
     try:
         # Convert ChatCompletions-style messages -> Responses API input blocks
         input_blocks = []
@@ -112,9 +106,9 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
         response = client.responses.create(
             model="gpt-5-chat-latest",
             input=input_blocks,
-            max_completion_tokens=MAX_OUTPUT_TOKENS,
+            max_tokens=MAX_OUTPUT_TOKENS,
             stop=["\n\n"]  # gentle stop; keeps answers tighter without changing your prompt
-            # NOTE: omit temperature; many gpt-5 variants fix it at 1
+            temperature=0.8
         )
 
         # Parse the text from Responses API
@@ -346,3 +340,4 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
