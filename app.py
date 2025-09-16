@@ -79,7 +79,7 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
     """Generate response using OpenAI's Responses API with structured messages."""
     try:
         response = client.responses.create(
-            model="gpt-4o",
+            model="gpt-5",
             input=messages,
             previous_response_id=previous_response_id,
             timeout=REQUEST_TIMEOUT,
@@ -300,4 +300,5 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
