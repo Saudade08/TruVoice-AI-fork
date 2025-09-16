@@ -106,7 +106,7 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
         response = client.responses.create(
             model="gpt-5-chat-latest",
             input=input_blocks,
-            max_tokens=MAX_OUTPUT_TOKENS,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
             temperature=0.8
         )
 
@@ -339,5 +339,6 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
 
