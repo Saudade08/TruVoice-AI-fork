@@ -126,7 +126,12 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
                 timeout=REQUEST_TIMEOUT
             )
         else:
-            # First call — include the full set of messages (system prompt, dev reminder, user)
+            background = load_background("background.txt")
+            system_prompt = SYSTEM_PROMPT.replace("{BACKGROUND}", background or "")
+            messages.insert(0,{
+                "role": "system",
+                "content": [{"type": "input_text", "text": system_prompt}]
+            })
             response = client.responses.create(
                 model="gpt-5-chat-latest",
                 input=messages,
@@ -328,6 +333,7 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
 
 
