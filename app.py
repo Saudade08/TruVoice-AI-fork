@@ -96,7 +96,7 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
         for i, m in enumerate(messages):
             block = {
                 "role": m["role"],
-                "content": [{"type": "text", "text": m["content"]}]
+                "content": [{"type": "input_text", "text": m["content"]}]
             }
             # Cache ONLY the first system block (stable persona)
             if i == 0 and m.get("role") == "system":
@@ -339,6 +339,7 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
 
 
