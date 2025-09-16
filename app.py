@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session
 from textblob import TextBlob
 from openai import OpenAI
 import os
@@ -20,8 +20,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-
 
 # Initialize Flask and OpenAI
 app = Flask(__name__)
@@ -53,17 +51,6 @@ with app.app_context():
 NEGATIVE_THRESHOLD = -0.3
 MAX_MESSAGE_LENGTH = 500
 REQUEST_TIMEOUT = 10  # seconds
-
-# Global state
-class SessionState:
-    def __init__(self):
-        self.conversation_history = []
-        self.negative_count = 0
-        self.is_ended = False
-        self.last_message_time = None
-        self.session_id = None  # Add this line
-
-state = SessionState()
 
 def clean_text(text: str) -> str:
     """Clean up text by removing special characters and extra whitespace."""
@@ -112,19 +99,23 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
 def log_conversation(user_message: str, assistant_response: str, sentiment: float) -> None:
     """Save conversation to database"""
     try:
-        if not state.session_id:
+        session_id = session.get('session_id')
+        negative_count = session.get('negative_count', 0)
+        
+        if not session_id:
             # Create a new session if one doesn't exist
-            state.session_id = str(uuid.uuid4())
-            new_session = ChatSession(id=state.session_id)
+            session_id = str(uuid.uuid4())
+            session['session_id'] = session_id
+            new_session = ChatSession(id=session_id)
             db.session.add(new_session)
             db.session.commit()
         
         log_entry = ChatLog(
-            session_id=state.session_id,
+            session_id=session_id,
             user_message=user_message,
             assistant_response=assistant_response,
             sentiment=sentiment,
-            negative_count=state.negative_count
+            negative_count=negative_count
         )
         db.session.add(log_entry)
         db.session.commit()
@@ -139,17 +130,14 @@ def home():
 @app.route('/status')
 def check_status():
     """Check the current session status."""
-    return jsonify({"ended": state.is_ended})
+    return jsonify({"ended": session.get('is_ended', False)})
 
 @app.route('/restart', methods=['POST'])
 def restart_session():
     """Reset the session state."""
     try:
-        state.conversation_history = []
-        state.negative_count = 0
-        state.is_ended = False
-        state.last_message_time = None
-        state.session_id = None
+        # Clear the session data
+        session.clear()
         return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Error restarting session: {e}")
@@ -157,7 +145,7 @@ def restart_session():
 
 @app.route('/start', methods=['POST'])
 def start_chat():
-    if state.is_ended:
+    if session.get('is_ended', False):
         return jsonify({
             "response": "Session has ended. Please restart to begin a new session.",
             "response_id": None,
@@ -188,9 +176,11 @@ Always start out with one word answers but warm up to longer responses over the 
 """
         }
 
-        # Initialize conversation history with just the instructions
-        state.conversation_history = [initial_instructions]
-        state.last_message_time = datetime.now()
+        # Initialize session data
+        session['conversation_history'] = [initial_instructions]
+        session['negative_count'] = 0
+        session['is_ended'] = False
+        session['last_message_time'] = datetime.now().isoformat()
 
         # Return empty response to not show initial message
         return jsonify({
@@ -205,7 +195,7 @@ Always start out with one word answers but warm up to longer responses over the 
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    if state.is_ended:
+    if session.get('is_ended', False):
         return jsonify({
             "response": "Session has ended. Please restart to begin a new session.",
             "response_id": None,
@@ -217,15 +207,20 @@ def chat():
         user_message = data['message'][:MAX_MESSAGE_LENGTH]
         previous_response_id = data.get('previous_response_id')
 
+        # Get data from session
+        conversation_history = session.get('conversation_history', [])
+        negative_count = session.get('negative_count', 0)
+
         # Sentiment analysis
         blob = TextBlob(user_message)
         sentiment = blob.sentiment.polarity
 
         # Negative sentiment handling
         if sentiment < NEGATIVE_THRESHOLD:
-            state.negative_count += 1
-            if state.negative_count >= 2:
-                state.is_ended = True
+            negative_count += 1
+            session['negative_count'] = negative_count
+            if negative_count >= 2:
+                session['is_ended'] = True
                 response = "I've made it clear that I need to be treated with respect. Since that's not happening, I'm ending this session. I hope you'll reflect on how your words impact others. Goodbye."
                 log_conversation(user_message, response, sentiment)
                 return jsonify({
@@ -234,29 +229,34 @@ def chat():
                     "ended": True
                 })
 
-        state.conversation_history.append({"role": "user", "content": user_message})
+        # Update conversation history
+        conversation_history.append({"role": "user", "content": user_message})
 
         # Explicit reminder to stay in character
         explicit_reminder = {
             "role": "developer",
             "content": "You are strictly Monae, never break character, respond naturally as a patient, not as an AI."
         }
-        state.conversation_history.insert(-1, explicit_reminder)
+        conversation_history.insert(-1, explicit_reminder)
 
-        response_text, response_id = chat_with_gpt(state.conversation_history, previous_response_id)
-        state.conversation_history.append({"role": "assistant", "content": response_text})
+        response_text, response_id = chat_with_gpt(conversation_history, previous_response_id)
+        conversation_history.append({"role": "assistant", "content": response_text})
 
         # Clean up explicit reminder
-        state.conversation_history.remove(explicit_reminder)
+        conversation_history.remove(explicit_reminder)
 
         # First negative interaction warning
-        if sentiment < NEGATIVE_THRESHOLD and state.negative_count == 1:
+        if sentiment < NEGATIVE_THRESHOLD and negative_count == 1:
             response_text = ("I need you to understand that using my correct name and treating me with respect "
                              "isn't optional—it's essential for this therapy to work. " + response_text)
-            state.negative_count +=.1
+            negative_count += 0.1
+            session['negative_count'] = negative_count
+
+        # Save updated conversation history back to session
+        session['conversation_history'] = conversation_history
+        session['last_message_time'] = datetime.now().isoformat()
 
         log_conversation(user_message, response_text, sentiment)
-        state.last_message_time = datetime.now()
 
         return jsonify({
             "response": response_text,
@@ -272,11 +272,12 @@ def chat():
 def download_logs():
     """Generate and serve chat logs as JSONL file for the current session"""
     try:
-        if not state.session_id:
+        session_id = session.get('session_id')
+        if not session_id:
             return jsonify({"error": "No session logs available"}), 404
             
-        logs = ChatLog.query.filter_by(session_id=state.session_id).order_by(ChatLog.timestamp).all()
-        temp_file = f"session_{state.session_id}_logs.jsonl"
+        logs = ChatLog.query.filter_by(session_id=session_id).order_by(ChatLog.timestamp).all()
+        temp_file = f"session_{session_id}_logs.jsonl"
         
         with open(temp_file, "w") as f:
             for log in logs:
@@ -297,4 +298,3 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
-
