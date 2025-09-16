@@ -90,20 +90,43 @@ def count_tokens(text: str, model: str = "gpt-4") -> int:
         return len(text) // 4
 
 def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
-    """Generate response using OpenAI's Chat Completions API with GPT-5."""
+    """
+    Generate response using OpenAI's Responses API with GPT-5.
+    - Caches the first system message (ephemeral cache).
+    - Uses max_completion_tokens (Responses API).
+    - Adds a gentle stop to curb verbosity.
+    """
     try:
-        response = client.chat.completions.create(
-            model="gpt-5-chat-latest",  # Changed to GPT-5
-            messages=messages,
-            temperature=0.8,
-            max_completion_tokens=MAX_OUTPUT_TOKENS
+        # Convert ChatCompletions-style messages -> Responses API input blocks
+        input_blocks = []
+        for i, m in enumerate(messages):
+            block = {
+                "role": m["role"],
+                "content": [{"type": "text", "text": m["content"]}]
+            }
+            # Cache ONLY the first system block (stable persona)
+            if i == 0 and m.get("role") == "system":
+                block["cache_control"] = {"type": "ephemeral"}
+            input_blocks.append(block)
+
+        response = client.responses.create(
+            model="gpt-5-chat-latest",
+            input=input_blocks,
+            max_completion_tokens=MAX_OUTPUT_TOKENS,
+            stop=["\n\n"]  # gentle stop; keeps answers tighter without changing your prompt
+            # NOTE: omit temperature; many gpt-5 variants fix it at 1
         )
-        
-        response_text = response.choices[0].message.content
-        return response_text, None  # response.id not available in chat completions
-    
+
+        # Parse the text from Responses API
+        text = ""
+        try:
+            text = response.output[0].content[0].text
+        except Exception:
+            text = getattr(response, "output_text", "")
+        return (text or "").strip(), response.id
+
     except Exception as e:
-        logger.error(f"Error during API call: {e}")
+        logger.error(f"Error during API call: {e}", exc_info=True)
         return "I need to take a break from this session. Thank you for understanding.", None
 
 def log_conversation(user_message: str, assistant_response: str, sentiment: float) -> None:
@@ -190,7 +213,7 @@ Always start out with one word answers but warm up to longer responses over the 
 """
         }
 
-        # Initialize session data
+        # Initialize session data (system message remains first and will be cached by chat_with_gpt)
         session['conversation_history'] = [initial_instructions]
         session['negative_count'] = 0
         session['is_ended'] = False
@@ -265,11 +288,12 @@ def chat():
         # Update conversation history
         conversation_history.append({"role": "user", "content": user_message})
 
+        # Generate with Responses API (system block will be cached automatically)
         response_text, response_id = chat_with_gpt(conversation_history)
     
         conversation_history.append({"role": "assistant", "content": response_text})
 
-        # First negative interaction warning
+        # First negative interaction warning (kept as in your original)
         if sentiment < NEGATIVE_THRESHOLD and negative_count == 1:
             response_text = ("I need you to understand that using my correct name and treating me with respect "
                              "isn't optional—it's essential for this therapy to work. " + response_text)
@@ -322,8 +346,3 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
-
-
-
-
-
