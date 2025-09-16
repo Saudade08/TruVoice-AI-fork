@@ -110,48 +110,31 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
       - Later turns: DO NOT resend system prompt; pass previous_response_id and only send the new user turn.
     """
     try:
-        input_blocks = []
+        # Build system block (every call)
+        background = load_background("background.txt")
+        system_text = SYSTEM_PROMPT.replace("{BACKGROUND}", background or "")
 
-        if previous_response_id:
-            # Subsequent turns: only the new user message(s)
-            for m in messages:
-                if m.get("role") == "user":
-                    input_blocks.append({
-                        "role": "user",
-                        "content": [{"type": "input_text", "text": m["content"]}]
-                    })
+        input_blocks = [{
+            "role": "system",
+            "content": [{"type": "input_text", "text": system_text}]
+        }]
 
-            resp = client.responses.create(
-                model="gpt-5-chat-latest",
-                input=input_blocks,
-                max_output_tokens=MAX_OUTPUT_TOKENS,
-                temperature=0.8
-            )
-        else:
-            # First turn: include cacheable system block + any user message(s)
-            # Build system block once, with background substituted
-            background = load_background("background.txt")
-            system_text = SYSTEM_PROMPT.replace("{BACKGROUND}", background or "")
-            system_block = {
-                "role": "system",
-                "content": [{"type": "input_text", "text": system_text}],
-                "cache_control": {"type": "ephemeral"}  # cache the static persona prompt
-            }
-            input_blocks.append(system_block)
+        # Append the provided messages (user/assistant) as-is
+        for m in messages:
+            role = m.get("role", "user")
+            text = m.get("content", "")
+            input_blocks.append({
+                "role": role,
+                "content": [{"type": "input_text", "text": text}]
+            })
 
-            for m in messages:
-                if m.get("role") == "user":
-                    input_blocks.append({
-                        "role": "user",
-                        "content": [{"type": "input_text", "text": m["content"]}]
-                    })
-
-            resp = client.responses.create(
-                model="gpt-5-chat-latest",
-                input=input_blocks,
-                max_output_tokens=MAX_OUTPUT_TOKENS,
-                temperature=0.8
-            )
+        # Keep your existing API call shape (no unsupported fields)
+        resp = client.responses.create(
+            model="gpt-5-chat-latest",
+            input=input_blocks,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
+            temperature=0.8  # keep if your model/SDK accepts it
+        )
 
         # Parse text robustly
         text = ""
@@ -346,6 +329,7 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
 
 
