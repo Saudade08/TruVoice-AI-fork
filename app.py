@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 db = SQLAlchemy(app)
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
@@ -298,3 +299,4 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
