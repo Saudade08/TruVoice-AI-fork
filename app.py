@@ -265,19 +265,6 @@ def chat():
         # Update conversation history
         conversation_history.append({"role": "user", "content": user_message})
 
-        # Explicit reminder to stay in character
-        explicit_reminder = {
-            "role": "system",
-            "content": "You are strictly Monae, never break character, respond naturally as a patient, not as an AI."
-        }
-        conversation_history.append(explicit_reminder)
-
-        response_text, response_id = chat_with_gpt(conversation_history)
-        
-        # Remove the explicit reminder after getting response
-        conversation_history.pop()  # Remove the last added reminder
-        conversation_history.append({"role": "assistant", "content": response_text})
-
         # First negative interaction warning
         if sentiment < NEGATIVE_THRESHOLD and negative_count == 1:
             response_text = ("I need you to understand that using my correct name and treating me with respect "
@@ -331,6 +318,7 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
 
 
