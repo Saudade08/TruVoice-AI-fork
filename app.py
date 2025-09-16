@@ -125,7 +125,6 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
                 model="gpt-5-chat-latest",
                 input=input_blocks,
                 max_output_tokens=MAX_OUTPUT_TOKENS,
-                stop=["\n\n"],
                 temperature=0.8
             )
         else:
@@ -151,7 +150,6 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
                 model="gpt-5-chat-latest",
                 input=input_blocks,
                 max_output_tokens=MAX_OUTPUT_TOKENS,
-                stop=["\n\n"],
                 temperature=0.8
             )
 
@@ -165,7 +163,7 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
         return (text.strip() if text else ""), getattr(resp, "id", None)
 
     except Exception as e:
-        logger.error("Error during API call", exc_info=True)
+        logger.error(e, exc_info=True)
         return "I need to take a break from this session. Thank you for understanding.", None
 
 # ---------------- Logging ----------------
@@ -348,4 +346,5 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
