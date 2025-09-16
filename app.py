@@ -105,48 +105,47 @@ def count_tokens(text: str, model: str = "gpt-4") -> int:
 # ---------------- OpenAI (Responses API) ----------------
 def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
     """
-    GPT-5 via Responses API with:
-      - First turn: send system prompt (marked cacheable) + user.
-      - Later turns: DO NOT resend system prompt; pass previous_response_id and only send the new user turn.
+    Generate response using OpenAI's Responses API with GPT-5.
+    - First call: send full conversation history (system/developer prompt + user).
+    - Later calls: send only the new user message(s) with previous_response_id to maintain context.
     """
     try:
-        # Build system block (every call)
-        background = load_background("background.txt")
-        system_text = SYSTEM_PROMPT.replace("{BACKGROUND}", background or "")
+        if previous_response_id:
+            # Only send the newest user message on threaded calls
+            last_user = None
+            for m in reversed(messages):
+                if m.get("role") == "user":
+                    last_user = m
+                    break
+            minimal_input = [last_user] if last_user else messages[-1:]
+            response = client.responses.create(
+                model="gpt-5-chat-latest",
+                input=minimal_input,
+                previous_response_id=previous_response_id,
+                temperature=0.8,
+                timeout=REQUEST_TIMEOUT
+            )
+        else:
+            # First call — include the full set of messages (system prompt, dev reminder, user)
+            response = client.responses.create(
+                model="gpt-5-chat-latest",
+                input=messages,
+                temperature=0.8,
+                timeout=REQUEST_TIMEOUT
+            )
 
-        input_blocks = [{
-            "role": "system",
-            "content": [{"type": "input_text", "text": system_text}]
-        }]
-
-        # Append the provided messages (user/assistant) as-is
-        for m in messages:
-            role = m.get("role", "user")
-            text = m.get("content", "")
-            input_blocks.append({
-                "role": role,
-                "content": [{"type": "input_text", "text": text}]
-            })
-
-        # Keep your existing API call shape (no unsupported fields)
-        resp = client.responses.create(
-            model="gpt-5-chat-latest",
-            input=input_blocks,
-            max_output_tokens=MAX_OUTPUT_TOKENS,
-            temperature=0.8  # keep if your model/SDK accepts it
+        # Extract text robustly
+        response_text = ''.join(
+            content.text
+            for item in getattr(response, "output", [])
+            if getattr(item, "type", "") == "message"
+            for content in getattr(item, "content", [])
+            if getattr(content, "type", "") == "output_text"
         )
-
-        # Parse text robustly
-        text = ""
-        try:
-            text = resp.output[0].content[0].text
-        except Exception:
-            text = getattr(resp, "output_text", "") or ""
-
-        return (text.strip() if text else ""), getattr(resp, "id", None)
+        return (response_text or "").strip(), getattr(response, "id", None)
 
     except Exception as e:
-        logger.error(e, exc_info=True)
+        logger.error(f"Error during API call: {e}", exc_info=True)
         return "I need to take a break from this session. Thank you for understanding.", None
 
 # ---------------- Logging ----------------
@@ -329,6 +328,7 @@ def download_logs():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
 
 
 
