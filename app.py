@@ -125,20 +125,10 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
                 resp = client.responses.create(
                     model="gpt-5-chat-latest",
                     input=input_blocks,
-                    previous_response_id=previous_response_id,
-                    max_completion_tokens=MAX_OUTPUT_TOKENS,
+                    max_output_tokens=MAX_OUTPUT_TOKENS,
                     stop=["\n\n"],
+                    temperature=0.8
                 )
-            except Exception as e1:
-                # Fallback param name variant (SDKs sometimes differ)
-                if "max_completion_tokens" in str(e1) or "unsupported_parameter" in str(e1):
-                    resp = client.responses.create(
-                        model="gpt-5-chat-latest",
-                        input=input_blocks,
-                        previous_response_id=previous_response_id,
-                        max_output_tokens=MAX_OUTPUT_TOKENS,
-                        stop=["\n\n"],
-                    )
         else:
             # First turn: include cacheable system block + any user message(s)
             # Build system block once, with background substituted
@@ -162,17 +152,10 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
                 resp = client.responses.create(
                     model="gpt-5-chat-latest",
                     input=input_blocks,
-                    max_completion_tokens=MAX_OUTPUT_TOKENS,
+                    max_output_tokens=MAX_OUTPUT_TOKENS,
                     stop=["\n\n"],
+                    temperature=0.8
                 )
-            except Exception as e1:
-                if "max_completion_tokens" in str(e1) or "unsupported_parameter" in str(e1):
-                    resp = client.responses.create(
-                        model="gpt-5-chat-latest",
-                        input=input_blocks,
-                        max_output_tokens=MAX_OUTPUT_TOKENS,
-                        stop=["\n\n"],
-                    )
 
         # Parse text robustly
         text = ""
