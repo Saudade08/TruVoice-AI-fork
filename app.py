@@ -7,6 +7,8 @@ from datetime import datetime
 import json
 from typing import Tuple, Optional, Dict, Any
 from flask import send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+import uuid
 
 # Configure logging
 logging.basicConfig(
@@ -19,10 +21,34 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+
 # Initialize Flask and OpenAI
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local.db').replace('postgres://', 'postgresql://')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
+class ChatSession(db.Model):
+    id = db.Column(db.String(36), primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    ended = db.Column(db.Boolean, default=False)
+    logs = db.relationship('ChatLog', backref='session', lazy=True)
+
+class ChatLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(36), db.ForeignKey('chat_session.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user_message = db.Column(db.Text)
+    assistant_response = db.Column(db.Text)
+    sentiment = db.Column(db.Float)
+    negative_count = db.Column(db.Integer)
+
+# Create tables
+with app.app_context():
+    db.create_all()
+    
 # Constants
 NEGATIVE_THRESHOLD = -0.3
 MAX_MESSAGE_LENGTH = 500
@@ -35,6 +61,7 @@ class SessionState:
         self.negative_count = 0
         self.is_ended = False
         self.last_message_time = None
+        self.session_id = None  # Add this line
 
 state = SessionState()
 
@@ -83,19 +110,27 @@ def chat_with_gpt(messages: list, previous_response_id: Optional[str] = None) ->
         return "I need to take a break from this session. Thank you for understanding.", None
 
 def log_conversation(user_message: str, assistant_response: str, sentiment: float) -> None:
-    """Log conversation details for analysis."""
+    """Save conversation to database"""
     try:
-        log_entry = {
-            "timestamp": datetime.now().isoformat(),
-            "user_message": user_message,
-            "assistant_response": assistant_response,
-            "sentiment": sentiment,
-            "negative_count": state.negative_count
-        }
-        with open("conversation_logs.jsonl", "a") as f:
-            f.write(json.dumps(log_entry) + "\n")
+        if not state.session_id:
+            # Create a new session if one doesn't exist
+            state.session_id = str(uuid.uuid4())
+            new_session = ChatSession(id=state.session_id)
+            db.session.add(new_session)
+            db.session.commit()
+        
+        log_entry = ChatLog(
+            session_id=state.session_id,
+            user_message=user_message,
+            assistant_response=assistant_response,
+            sentiment=sentiment,
+            negative_count=state.negative_count
+        )
+        db.session.add(log_entry)
+        db.session.commit()
     except Exception as e:
-        logger.error(f"Error logging conversation: {e}")
+        logger.error(f"Error saving to database: {e}")
+        db.session.rollback()
 
 @app.route('/')
 def home():
@@ -114,6 +149,7 @@ def restart_session():
         state.negative_count = 0
         state.is_ended = False
         state.last_message_time = None
+        state.session_id = None
         return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Error restarting session: {e}")
@@ -234,11 +270,31 @@ def chat():
 
 @app.route('/download-logs')
 def download_logs():
-    """Serves the chat log file as a downloadable attachment."""
-    log_directory = os.getcwd()  # Adjust path if logs are stored elsewhere
-    log_filename = 'conversation_logs.jsonl'
-    return send_from_directory(directory=log_directory, path=log_filename, as_attachment=True)
+    """Generate and serve chat logs as JSONL file for the current session"""
+    try:
+        if not state.session_id:
+            return jsonify({"error": "No session logs available"}), 404
+            
+        logs = ChatLog.query.filter_by(session_id=state.session_id).order_by(ChatLog.timestamp).all()
+        temp_file = f"session_{state.session_id}_logs.jsonl"
+        
+        with open(temp_file, "w") as f:
+            for log in logs:
+                log_entry = {
+                    "timestamp": log.timestamp.isoformat(),
+                    "user_message": log.user_message,
+                    "assistant_response": log.assistant_response,
+                    "sentiment": log.sentiment,
+                    "negative_count": log.negative_count
+                }
+                f.write(json.dumps(log_entry) + "\n")
+        
+        return send_from_directory(os.getcwd(), temp_file, as_attachment=True)
+    except Exception as e:
+        logger.error(f"Error generating download file: {e}")
+        return jsonify({"error": "Failed to generate logs"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, port=port)
+
